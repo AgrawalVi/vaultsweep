@@ -1,0 +1,4 @@
+name,url,username,password
+Good Entry,https://good.example.com,user@example.com,hunter2
+Ragged Row,https://ragged.example.com,user@example.com
+Also Good,https://good2.example.com,user@example.com,correct-horse

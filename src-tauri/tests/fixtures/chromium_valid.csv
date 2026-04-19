@@ -1,0 +1,4 @@
+name,url,username,password
+My Bank,https://bank.example.com,user@example.com,hunter2
+Social Media,https://social.example.com,user@example.com,correct-horse-battery-staple
+Work Email,https://mail.example.com,user@work.example.com,staple-battery-horse

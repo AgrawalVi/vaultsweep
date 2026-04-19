@@ -1,0 +1,4 @@
+Title,URL,Username,Password,Notes,OTPAuth
+My Bank,https://bank.example.com,user@example.com,hunter2,Banking account,
+Social Media,https://social.example.com,user@example.com,correct-horse-battery-staple,,otpauth://totp/Social:user@example.com?secret=JBSWY3DPEHPK3PXP
+Work Email,https://mail.example.com,user@work.example.com,staple-battery-horse,,

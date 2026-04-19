@@ -1,0 +1,3 @@
+url,username,password,httpRealm,formActionOrigin,guid,timeCreated,timeLastUsed,timePasswordChanged
+https://bank.example.com,user@example.com,hunter2,,https://bank.example.com,{abc123},1700000000000,1700000001000,1700000000000
+https://social.example.com,user@example.com,correct-horse-battery-staple,,https://social.example.com,{def456},1700000002000,1700000003000,1700000002000

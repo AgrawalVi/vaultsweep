@@ -1,0 +1,3 @@
+url,username,password,httpRealm,formActionOrigin,guid,timeCreated,timeLastUsed,timePasswordChanged
+https://good.example.com,user@example.com,hunter2,,https://good.example.com,{abc},1000,2000,1000
+https://empty.example.com,user@example.com,,,https://empty.example.com,{def},1000,2000,1000

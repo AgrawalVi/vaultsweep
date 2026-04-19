@@ -1,0 +1,3 @@
+name,url,username,password
+Personal Bank,https://bank.example.com,personal@example.com,hunter2
+Personal Email,https://mail.example.com,personal@example.com,correct-horse
