@@ -45,7 +45,7 @@ pub enum ParseError {
         source: std::io::Error,
     },
 
-    /// An error that can occur when parsing a password CSV file, usually due to a malformed file. 
+    /// An error that can occur when parsing a password CSV file, usually due to a malformed file.
     #[error("CSV parse error at {path}: {source}")]
     CsvError {
         path: std::path::PathBuf,
