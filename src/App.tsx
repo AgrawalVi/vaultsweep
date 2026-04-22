@@ -1,18 +1,20 @@
 import './App.css'
 import { AppShell } from './components/shell/AppShell'
 import { WelcomeScreen } from './components/wizard/WelcomeScreen'
-import { ImportScreen } from './components/wizard/ImportScreen'
-import { TriageScreen } from './components/wizard/TriageScreen'
-import { ExecuteScreen } from './components/wizard/ExecuteScreen'
-import { DoneScreen } from './components/wizard/DoneScreen'
+import { ConnectSourcesScreen } from './components/wizard/ConnectSourcesScreen'
+import { ImportSummaryScreen } from './components/wizard/ImportSummaryScreen'
+import { MergeConflictScreen } from './components/wizard/MergeConflictScreen'
+import { TriageCardScreen } from './components/wizard/TriageCardScreen'
+import { TriageCompleteScreen } from './components/wizard/TriageCompleteScreen'
 import { useWizardStore, type WizardStep } from './lib/store'
 
 const screens: Record<WizardStep, React.ReactNode> = {
-  welcome: <WelcomeScreen />,
-  import: <ImportScreen />,
-  triage: <TriageScreen />,
-  execute: <ExecuteScreen />,
-  done: <DoneScreen />,
+  'welcome': <WelcomeScreen />,
+  'connect-sources': <ConnectSourcesScreen />,
+  'import-summary': <ImportSummaryScreen />,
+  'merge-conflict': <MergeConflictScreen />,
+  'triage-card': <TriageCardScreen />,
+  'triage-complete': <TriageCompleteScreen />,
 }
 
 function App() {

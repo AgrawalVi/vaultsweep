@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo test *)",
+      "Bash(gunzip -c \"/Users/vishrutagrawal/.claude/projects/-Users-vishrutagrawal-repos-vaultsweep/e836e9fd-88f1-42f8-a5b0-5915aa33d410/tool-results/webfetch-1776837196350-vjnbg9.bin\")",
+      "Bash(tar -t)",
+      "Bash(grep -v \"/$\")",
+      "Bash(tar -xO \"vaultsweep/project/src/styles/globals.css\")",
+      "Bash(tar -xO \"vaultsweep/project/CLAUDE.md\")",
+      "Bash(tar -xO \"vaultsweep/project/src/styles/README.md\")"
+    ]
+  }
+}
