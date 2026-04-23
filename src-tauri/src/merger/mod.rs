@@ -1,3 +1,5 @@
+mod boring_subdomains;
+
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt;
@@ -5,6 +7,7 @@ use url::Url;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::parsers::RawEntry;
+use boring_subdomains::BORING_SUBDOMAIN_LABELS;
 
 #[derive(Zeroize, ZeroizeOnDrop, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -44,16 +47,9 @@ pub struct MergedAccount {
     pub subdomain_is_interesting: bool,
 }
 
-/// Subdomain labels considered "boring" — these mean the merge is a common same-org pattern
-/// (mail.google.com, accounts.google.com, www.github.com) rather than a semantically different
-/// subdomain (company-a.okta.com vs company-b.okta.com).
-const BORING_SUBDOMAIN_LABELS: &[&str] = &[
-    "www", "mail", "accounts", "login", "auth", "m", "app", "secure", "id", "account", "portal",
-    "web", "mobile",
-];
-
 /// Extract the subdomain prefix for a URL, relative to its registrable domain.
 /// E.g. "https://login.accounts.google.com/foo" with registrable "google.com" → "login.accounts".
+/// A leading `www.` is normalised away: `https://www.github.com` → "" (same as the bare domain).
 /// Returns an empty string for the bare registrable domain or when parsing fails.
 fn extract_subdomain(url_str: &str, registrable: &str) -> String {
     let host = match Url::parse(url_str)
@@ -66,10 +62,15 @@ fn extract_subdomain(url_str: &str, registrable: &str) -> String {
     if host == registrable {
         return String::new();
     }
-    host.strip_suffix(registrable)
+    let sub = host
+        .strip_suffix(registrable)
         .and_then(|prefix| prefix.strip_suffix('.'))
-        .unwrap_or("")
-        .to_string()
+        .unwrap_or("");
+    // Treat `www` as equivalent to the bare domain.
+    if sub == "www" {
+        return String::new();
+    }
+    sub.strip_prefix("www.").unwrap_or(sub).to_string()
 }
 
 /// A subdomain is "boring" if it's empty (bare domain) or every dot-separated label
@@ -306,15 +307,29 @@ mod tests {
 
     #[test]
     fn boring_subdomain_merge_not_interesting() {
-        // www + bare: boring merge, flagged but not interesting.
+        // mail + bare: boring merge, flagged but not interesting.
+        let entries = vec![
+            make_entry("https://mail.google.com", "alice", "secret", "icloud"),
+            make_entry("https://google.com", "alice", "secret", "chrome"),
+        ];
+        let result = merge(entries);
+        assert_eq!(result.len(), 1);
+        assert!(result[0].is_subdomain_merge);
+        assert!(!result[0].subdomain_is_interesting);
+    }
+
+    #[test]
+    fn www_merges_clean_not_subdomain() {
+        // www.github.com + github.com should be a clean merge, not a subdomain merge.
         let entries = vec![
             make_entry("https://www.github.com", "alice", "secret", "icloud"),
             make_entry("https://github.com", "alice", "secret", "chrome"),
         ];
         let result = merge(entries);
         assert_eq!(result.len(), 1);
-        assert!(result[0].is_subdomain_merge);
+        assert!(!result[0].is_subdomain_merge);
         assert!(!result[0].subdomain_is_interesting);
+        assert_eq!(result[0].sources.len(), 2);
     }
 
     #[test]
