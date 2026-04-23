@@ -34,3 +34,19 @@ export interface ParseResult {
   warnings: ParseWarning[];
   errors: SourceError[];
 }
+
+export interface PasswordEntry {
+  password: string;
+  source: string;
+}
+
+export interface MergedAccount {
+  normalizedDomain: string;
+  username: string;
+  sources: string[];
+  title: string | null;
+  notes: string | null;
+  otpAuth: string | null;
+  passwords: PasswordEntry[];
+  hasConflict: boolean;
+}

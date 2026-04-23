@@ -1,22 +1,12 @@
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { useWizardStore, FAKE_TRIAGE_COUNT } from '@/lib/store'
-
-const FAKE_ACCOUNTS = [
-  { domain: 'twitter.com', username: 'you@example.com' },
-  { domain: 'linkedin.com', username: 'you@example.com' },
-  { domain: 'netflix.com', username: 'you@example.com' },
-  { domain: 'spotify.com', username: 'you@example.com' },
-  { domain: 'dropbox.com', username: 'you@example.com' },
-  { domain: 'amazon.com', username: 'you@example.com' },
-  { domain: 'reddit.com', username: 'you@example.com' },
-  { domain: 'slack.com', username: 'you@example.com' },
-]
+import { useWizardStore } from '@/lib/store'
 
 export function TriageCardScreen() {
-  const { triageIndex, decideTriage, back } = useWizardStore()
-  const account = FAKE_ACCOUNTS[Math.min(triageIndex, FAKE_ACCOUNTS.length - 1)]
+  const { triageIndex, mergedAccounts, decideTriage, back } = useWizardStore()
+  const account = mergedAccounts[triageIndex]
+  const total = mergedAccounts.length
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -28,22 +18,27 @@ export function TriageCardScreen() {
     return () => window.removeEventListener('keydown', handleKey)
   }, [decideTriage])
 
+  if (!account) return null
+
   return (
     <div className="flex flex-col h-full gap-6 p-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Review accounts</h2>
         <span className="text-xs text-muted-foreground">
-          {triageIndex + 1} of {FAKE_TRIAGE_COUNT}
+          {triageIndex + 1} of {total}
         </span>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>{account.domain}</CardTitle>
-          <CardDescription>{account.username}</CardDescription>
+          <CardTitle>{account.normalizedDomain || account.title || 'Unknown'}</CardTitle>
+          <CardDescription>{account.username || '(no username)'}</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-1">
           <p className="text-xs text-muted-foreground">Password hidden</p>
+          {account.sources.length > 0 && (
+            <p className="text-xs text-muted-foreground">Sources: {account.sources.join(', ')}</p>
+          )}
         </CardContent>
       </Card>
 
