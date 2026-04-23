@@ -6,6 +6,7 @@ import { WelcomeScreen } from './components/wizard/WelcomeScreen'
 import { ConnectSourcesScreen } from './components/wizard/ConnectSourcesScreen'
 import { ImportSummaryScreen } from './components/wizard/ImportSummaryScreen'
 import { MergeConflictScreen } from './components/wizard/MergeConflictScreen'
+import { ReviewMergesScreen } from './components/wizard/ReviewMergesScreen'
 import { TriageCardScreen } from './components/wizard/TriageCardScreen'
 import { TriageCompleteScreen } from './components/wizard/TriageCompleteScreen'
 import { CsvEntriesDebug } from './components/debug/CsvEntriesDebug'
@@ -17,6 +18,7 @@ const screens: Record<WizardStep, React.ReactNode> = {
   'connect-sources': <ConnectSourcesScreen />,
   'import-summary': <ImportSummaryScreen />,
   'merge-conflict': <MergeConflictScreen />,
+  'review-merges': <ReviewMergesScreen />,
   'triage-card': <TriageCardScreen />,
   'triage-complete': <TriageCompleteScreen />,
 }

@@ -4,7 +4,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { useWizardStore } from '@/lib/store'
 
 export function ImportSummaryScreen() {
-  const { rawEntries, mergedAccounts, mergePending, mergeError, runMerge, advance, back } = useWizardStore()
+  const { rawEntries, rawMergedAccounts, mergePending, mergeError, runMerge, advance, back } = useWizardStore()
+  const mergedAccounts = rawMergedAccounts
 
   useEffect(() => {
     runMerge()

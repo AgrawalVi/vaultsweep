@@ -38,6 +38,9 @@ export interface ParseResult {
 export interface PasswordEntry {
   password: string;
   source: string;
+  /** Original URL this password was saved under, if any. Lets the conflict UI show
+   *  per-candidate subdomain info and preserve it on "Keep separate". */
+  url: string | null;
 }
 
 export interface MergedAccount {
