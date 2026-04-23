@@ -21,16 +21,43 @@ const STEPS: WizardStep[] = [
   'triage-complete',
 ]
 
-export const SOURCE_FORMAT: Record<string, BrowserFormat> = {
-  icloud: 'icloud',
-  chrome: 'chromium',
-  arc: 'chromium',
-}
-
 interface TriageDecisions {
   keep: number
   delete: number
   skip: number
+}
+
+/** One CSV file the user added under a category. Multiple uploads per category are allowed.
+ *  `name` is user-editable and becomes the source label shown in triage and the merger. */
+export interface UploadedSource {
+  id: string
+  category: BrowserFormat
+  name: string
+  path: string
+  entries: RawEntry[]
+  error: string | null
+  pending: boolean
+}
+
+export const CATEGORY_DEFAULT_NAME: Record<BrowserFormat, string> = {
+  icloud: 'Safari',
+  chromium: 'Chrome',
+  firefox: 'Firefox',
+}
+
+function suggestUploadName(uploads: UploadedSource[], category: BrowserFormat): string {
+  const base = CATEGORY_DEFAULT_NAME[category]
+  const existing = uploads.filter(u => u.category === category).length
+  return existing === 0 ? base : `${base} (${existing + 1})`
+}
+
+function recomputeRawEntries(uploads: UploadedSource[]): RawEntry[] {
+  return uploads.flatMap(u => u.entries.map(e => ({ ...e, source: u.name })))
+}
+
+function newUploadId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
+  return `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
 export type ConflictResolution =
@@ -138,9 +165,7 @@ interface WizardStore {
   step: WizardStep
   history: WizardStep[]
 
-  sourceCounts: Record<string, number>
-  sourceErrors: Record<string, string>
-  sourcePending: Record<string, boolean>
+  uploads: UploadedSource[]
   rawEntries: RawEntry[]
 
   /** Raw merger output, preserved so we can re-derive resolutions if the user goes Back. */
@@ -170,7 +195,9 @@ interface WizardStore {
   back: () => void
   reset: () => void
 
-  addSource: (id: string, target: ImportTarget) => Promise<void>
+  addUpload: (category: BrowserFormat, path: string) => Promise<void>
+  renameUpload: (id: string, name: string) => void
+  removeUpload: (id: string) => void
   runMerge: () => Promise<void>
 
   resolveConflict: (accountIdx: number, resolution: ConflictResolution) => void
@@ -191,9 +218,7 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
   step: 'welcome',
   history: [],
 
-  sourceCounts: {},
-  sourceErrors: {},
-  sourcePending: {},
+  uploads: [],
   rawEntries: [],
 
   rawMergedAccounts: [],
@@ -241,9 +266,7 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
     set({
       step: 'welcome',
       history: [],
-      sourceCounts: {},
-      sourceErrors: {},
-      sourcePending: {},
+      uploads: [],
       rawEntries: [],
       rawMergedAccounts: [],
       mergedAccounts: [],
@@ -259,32 +282,56 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
       triageDecisions: { keep: 0, delete: 0, skip: 0 },
     }),
 
-  addSource: async (id, target) => {
-    set(s => ({ sourcePending: { ...s.sourcePending, [id]: true }, sourceErrors: { ...s.sourceErrors, [id]: '' } }))
+  addUpload: async (category, path) => {
+    const id = newUploadId()
+    const name = suggestUploadName(get().uploads, category)
+    const placeholder: UploadedSource = {
+      id,
+      category,
+      name,
+      path,
+      entries: [],
+      error: null,
+      pending: true,
+    }
+    set(s => ({ uploads: [...s.uploads, placeholder] }))
+
+    const target: ImportTarget = { format: category, name, path }
     try {
       const result = await parseCsvs([target])
+      const errorMsg = result.errors.length > 0
+        ? result.errors.map((e: SourceError) => e.message).join('; ')
+        : null
       set(s => {
-        const filtered = s.rawEntries.filter(e => e.source !== target.name)
-        const merged = [...filtered, ...result.entries]
-        const errors = { ...s.sourceErrors }
-        if (result.errors.length > 0) {
-          errors[id] = result.errors.map((e: SourceError) => e.message).join('; ')
-        } else {
-          delete errors[id]
-        }
-        return {
-          sourceCounts: { ...s.sourceCounts, [id]: result.entries.length },
-          sourceErrors: errors,
-          sourcePending: { ...s.sourcePending, [id]: false },
-          rawEntries: merged,
-        }
+        const uploads = s.uploads.map(u =>
+          u.id === id ? { ...u, entries: result.entries, error: errorMsg, pending: false } : u,
+        )
+        return { uploads, rawEntries: recomputeRawEntries(uploads) }
       })
     } catch (err) {
-      set(s => ({
-        sourceErrors: { ...s.sourceErrors, [id]: String(err) },
-        sourcePending: { ...s.sourcePending, [id]: false },
-      }))
+      set(s => {
+        const uploads = s.uploads.map(u =>
+          u.id === id ? { ...u, error: String(err), pending: false } : u,
+        )
+        return { uploads, rawEntries: recomputeRawEntries(uploads) }
+      })
     }
+  },
+
+  renameUpload: (id, name) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    set(s => {
+      const uploads = s.uploads.map(u => (u.id === id ? { ...u, name: trimmed } : u))
+      return { uploads, rawEntries: recomputeRawEntries(uploads) }
+    })
+  },
+
+  removeUpload: id => {
+    set(s => {
+      const uploads = s.uploads.filter(u => u.id !== id)
+      return { uploads, rawEntries: recomputeRawEntries(uploads) }
+    })
   },
 
   runMerge: async () => {

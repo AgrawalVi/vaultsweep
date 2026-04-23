@@ -16,6 +16,12 @@ export function pickCsvFile(): Promise<string | null> {
   return open({ filters: [{ name: "CSV", extensions: ["csv"] }] });
 }
 
+export async function pickCsvFiles(): Promise<string[]> {
+  const result = await open({ filters: [{ name: "CSV", extensions: ["csv"] }], multiple: true });
+  if (result === null) return [];
+  return Array.isArray(result) ? result : [result];
+}
+
 export async function openDebugCsvWindow(): Promise<void> {
   const existing = await WebviewWindow.getByLabel("debug-csv");
   if (existing) {
