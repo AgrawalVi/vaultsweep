@@ -29,6 +29,7 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 url = "2"
 psl = "2"
+tauri-plugin-dialog = "2"
 
 [dev-dependencies]
 tempfile = "3"

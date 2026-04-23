@@ -7,6 +7,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 use crate::parsers::RawEntry;
 
 #[derive(Zeroize, ZeroizeOnDrop, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct PasswordEntry {
     pub password: String,
     pub source: String,
@@ -23,6 +24,7 @@ impl fmt::Debug for PasswordEntry {
 
 // Debug is safe to derive: passwords are Vec<PasswordEntry>, whose own Debug redacts the password field.
 #[derive(Debug, Zeroize, ZeroizeOnDrop, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct MergedAccount {
     pub normalized_domain: String,
     pub username: String,

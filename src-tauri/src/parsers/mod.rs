@@ -2,12 +2,13 @@ pub mod chromium;
 pub mod firefox;
 pub mod icloud;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 // WARNING: Do not derive Debug — password field must remain REDACTED.
-#[derive(Zeroize, ZeroizeOnDrop, Serialize, Clone)]
+#[derive(Zeroize, ZeroizeOnDrop, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 /// A raw entry from a password CSV file.
 pub struct RawEntry {
     pub source: String,

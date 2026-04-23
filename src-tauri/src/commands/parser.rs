@@ -50,3 +50,10 @@ pub fn parse_csvs(targets: Vec<ImportTarget>) -> ParseResult {
         errors: all_errors,
     }
 }
+
+#[tauri::command]
+pub fn merge_entries(entries: Vec<crate::parsers::RawEntry>) -> Vec<crate::merger::MergedAccount> {
+    let result = crate::merger::merge(entries);
+    tracing::info!(account_count = result.len(), "merge_entries completed");
+    result
+}
