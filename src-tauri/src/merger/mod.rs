@@ -14,6 +14,10 @@ use boring_subdomains::BORING_SUBDOMAIN_LABELS;
 pub struct PasswordEntry {
     pub password: String,
     pub source: String,
+    /// The original URL this password was saved under. Needed by the conflict-resolution UI
+    /// so users can see which subdomain each candidate came from and preserve it when
+    /// choosing to keep the candidates as separate accounts.
+    pub url: Option<String>,
 }
 
 impl fmt::Debug for PasswordEntry {
@@ -21,6 +25,7 @@ impl fmt::Debug for PasswordEntry {
         f.debug_struct("PasswordEntry")
             .field("password", &"[REDACTED]")
             .field("source", &self.source)
+            .field("url", &self.url)
             .finish()
     }
 }
@@ -164,6 +169,7 @@ pub fn merge(entries: Vec<RawEntry>) -> Vec<MergedAccount> {
                     passwords.push(PasswordEntry {
                         password: entry.password.clone(),
                         source: entry.source.clone(),
+                        url: entry.url.clone(),
                     });
                 }
             }
