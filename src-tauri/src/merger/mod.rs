@@ -34,6 +34,51 @@ pub struct MergedAccount {
     pub otp_auth: Option<String>,
     pub passwords: Vec<PasswordEntry>,
     pub has_conflict: bool,
+    /// All original URLs contributing to this merged account (distinct, insertion-order preserved).
+    /// Needed by the Review Merges window to show/split the constituent rows.
+    pub all_urls: Vec<String>,
+    /// True when two or more distinct subdomains share the same registrable domain + username + password.
+    pub is_subdomain_merge: bool,
+    /// True when at least one of the merged subdomains is "interesting" (not in the boring set).
+    /// Only meaningful when `is_subdomain_merge` is true.
+    pub subdomain_is_interesting: bool,
+}
+
+/// Subdomain labels considered "boring" — these mean the merge is a common same-org pattern
+/// (mail.google.com, accounts.google.com, www.github.com) rather than a semantically different
+/// subdomain (company-a.okta.com vs company-b.okta.com).
+const BORING_SUBDOMAIN_LABELS: &[&str] = &[
+    "www", "mail", "accounts", "login", "auth", "m", "app", "secure", "id", "account", "portal",
+    "web", "mobile",
+];
+
+/// Extract the subdomain prefix for a URL, relative to its registrable domain.
+/// E.g. "https://login.accounts.google.com/foo" with registrable "google.com" → "login.accounts".
+/// Returns an empty string for the bare registrable domain or when parsing fails.
+fn extract_subdomain(url_str: &str, registrable: &str) -> String {
+    let host = match Url::parse(url_str)
+        .ok()
+        .and_then(|u| u.host_str().map(str::to_lowercase))
+    {
+        Some(h) => h,
+        None => return String::new(),
+    };
+    if host == registrable {
+        return String::new();
+    }
+    host.strip_suffix(registrable)
+        .and_then(|prefix| prefix.strip_suffix('.'))
+        .unwrap_or("")
+        .to_string()
+}
+
+/// A subdomain is "boring" if it's empty (bare domain) or every dot-separated label
+/// is in the boring set. Anything else is "interesting".
+fn subdomain_is_boring(sub: &str) -> bool {
+    if sub.is_empty() {
+        return true;
+    }
+    sub.split('.').all(|label| BORING_SUBDOMAIN_LABELS.contains(&label))
 }
 
 /// Extract the registrable domain from a URL string.
@@ -86,6 +131,8 @@ pub fn merge(entries: Vec<RawEntry>) -> Vec<MergedAccount> {
             let mut title: Option<String> = None;
             let mut notes: Option<String> = None;
             let mut otp_auth: Option<String> = None;
+            let mut all_urls: Vec<String> = Vec::new();
+            let mut subdomains: Vec<String> = Vec::new();
 
             for entry in entries {
                 if !sources.contains(&entry.source) {
@@ -101,6 +148,16 @@ pub fn merge(entries: Vec<RawEntry>) -> Vec<MergedAccount> {
                     otp_auth = entry.otp_auth.clone();
                 }
 
+                if let Some(url) = entry.url.as_deref() {
+                    if !all_urls.iter().any(|u| u == url) {
+                        all_urls.push(url.to_string());
+                    }
+                    let sub = extract_subdomain(url, &normalized_domain);
+                    if !subdomains.iter().any(|s| s == &sub) {
+                        subdomains.push(sub);
+                    }
+                }
+
                 let already_seen = passwords.iter().any(|p| p.password == entry.password);
                 if !already_seen {
                     passwords.push(PasswordEntry {
@@ -111,6 +168,9 @@ pub fn merge(entries: Vec<RawEntry>) -> Vec<MergedAccount> {
             }
 
             let has_conflict = passwords.len() > 1;
+            let is_subdomain_merge = !has_conflict && subdomains.len() > 1;
+            let subdomain_is_interesting =
+                is_subdomain_merge && subdomains.iter().any(|s| !subdomain_is_boring(s));
 
             MergedAccount {
                 normalized_domain,
@@ -121,6 +181,9 @@ pub fn merge(entries: Vec<RawEntry>) -> Vec<MergedAccount> {
                 otp_auth,
                 passwords,
                 has_conflict,
+                all_urls,
+                is_subdomain_merge,
+                subdomain_is_interesting,
             }
         })
         .collect()
@@ -239,6 +302,75 @@ mod tests {
         let result = merge(entries);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].normalized_domain, "google.com");
+    }
+
+    #[test]
+    fn boring_subdomain_merge_not_interesting() {
+        // www + bare: boring merge, flagged but not interesting.
+        let entries = vec![
+            make_entry("https://www.github.com", "alice", "secret", "icloud"),
+            make_entry("https://github.com", "alice", "secret", "chrome"),
+        ];
+        let result = merge(entries);
+        assert_eq!(result.len(), 1);
+        assert!(result[0].is_subdomain_merge);
+        assert!(!result[0].subdomain_is_interesting);
+    }
+
+    #[test]
+    fn interesting_subdomain_merge_flagged() {
+        // company-a.okta.com vs company-b.okta.com: interesting merge.
+        let entries = vec![
+            make_entry("https://company-a.okta.com", "alice", "secret", "icloud"),
+            make_entry("https://company-b.okta.com", "alice", "secret", "chrome"),
+        ];
+        let result = merge(entries);
+        assert_eq!(result.len(), 1);
+        assert!(result[0].is_subdomain_merge);
+        assert!(result[0].subdomain_is_interesting);
+    }
+
+    #[test]
+    fn clean_merge_not_subdomain_merge() {
+        // Same URL from two sources: clean merge, no subdomain flag.
+        let entries = vec![
+            make_entry("https://github.com", "alice", "secret", "icloud"),
+            make_entry("https://github.com", "alice", "secret", "chrome"),
+        ];
+        let result = merge(entries);
+        assert!(!result[0].is_subdomain_merge);
+        assert!(!result[0].subdomain_is_interesting);
+    }
+
+    #[test]
+    fn conflict_is_not_subdomain_merge() {
+        // Different passwords: classified as conflict, subdomain flags stay false.
+        let entries = vec![
+            make_entry("https://mail.google.com", "alice", "old", "icloud"),
+            make_entry("https://accounts.google.com", "alice", "new", "chrome"),
+        ];
+        let result = merge(entries);
+        assert!(result[0].has_conflict);
+        assert!(!result[0].is_subdomain_merge);
+    }
+
+    #[test]
+    fn all_urls_preserved() {
+        let entries = vec![
+            make_entry("https://mail.google.com", "alice", "secret", "icloud"),
+            make_entry("https://accounts.google.com", "alice", "secret", "chrome"),
+            make_entry("https://mail.google.com", "alice", "secret", "arc"),
+        ];
+        let result = merge(entries);
+        assert_eq!(result[0].all_urls.len(), 2);
+        assert!(result[0]
+            .all_urls
+            .iter()
+            .any(|u| u == "https://mail.google.com"));
+        assert!(result[0]
+            .all_urls
+            .iter()
+            .any(|u| u == "https://accounts.google.com"));
     }
 
     #[test]
