@@ -11,7 +11,7 @@ use super::{find_col, open_reader, opt_str, ParseError, ParseWarning, RawEntry};
 pub fn parse_icloud(path: &Path) -> Result<(Vec<RawEntry>, Vec<ParseWarning>), ParseError> {
     let (mut rdr, headers) = open_reader(path, false)?;
 
-    for field in &["Title", "URL", "Username", "Password", "Notes", "OTPAuth"] {
+    for field in &["Title", "URL", "Username", "Password", "Notes"] {
         if find_col(&headers, field).is_none() {
             return Err(ParseError::MissingRequiredField {
                 field: field.to_string(),
@@ -25,7 +25,8 @@ pub fn parse_icloud(path: &Path) -> Result<(Vec<RawEntry>, Vec<ParseWarning>), P
     let idx_username = find_col(&headers, "Username").unwrap();
     let idx_password = find_col(&headers, "Password").unwrap();
     let idx_notes = find_col(&headers, "Notes").unwrap();
-    let idx_otp = find_col(&headers, "OTPAuth").unwrap();
+    // OTPAuth was added to iCloud exports in macOS Sonoma; older exports omit it.
+    let idx_otp = find_col(&headers, "OTPAuth");
 
     let mut entries: Vec<RawEntry> = Vec::new();
     let mut warnings: Vec<ParseWarning> = Vec::new();
@@ -63,7 +64,7 @@ pub fn parse_icloud(path: &Path) -> Result<(Vec<RawEntry>, Vec<ParseWarning>), P
             username: opt_str(record.get(idx_username).unwrap_or("")),
             password,
             notes: opt_str(record.get(idx_notes).unwrap_or("")),
-            otp_auth: opt_str(record.get(idx_otp).unwrap_or("")),
+            otp_auth: idx_otp.and_then(|i| opt_str(record.get(i).unwrap_or(""))),
         });
     }
 
@@ -160,6 +161,18 @@ mod tests {
         let (entries, warnings) = parse_icloud(f.path()).unwrap();
         assert_eq!(entries.len(), 1);
         assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn test_parse_icloud_missing_otpauth_column_ok() {
+        // Older iCloud exports (pre-Sonoma) don't include the OTPAuth column.
+        let f = write_csv(
+            "Title,URL,Username,Password,Notes\nSite,https://a.com,u,hunter2,\n",
+        );
+        let (entries, warnings) = parse_icloud(f.path()).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert!(warnings.is_empty());
+        assert!(entries[0].otp_auth.is_none());
     }
 
     #[test]
