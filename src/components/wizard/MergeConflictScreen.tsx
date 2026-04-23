@@ -1,9 +1,12 @@
+import { useState } from 'react'
+import { EyeIcon, EyeOffIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { useWizardStore } from '@/lib/store'
 
 export function MergeConflictScreen() {
   const { mergedAccounts, mergeConflictIndex, resolveConflict, back } = useWizardStore()
+  const [showPasswords, setShowPasswords] = useState(false)
 
   const conflicts = mergedAccounts
     .map((a, i) => ({ account: a, idx: i }))
@@ -26,8 +29,20 @@ export function MergeConflictScreen() {
         </p>
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">{account.normalizedDomain} · {account.username}</p>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowPasswords(v => !v)}
+        >
+          {showPasswords ? (
+            <EyeOffIcon data-icon="inline-start" />
+          ) : (
+            <EyeIcon data-icon="inline-start" />
+          )}
+          {showPasswords ? 'Hide' : 'Show'} passwords
+        </Button>
       </div>
 
       <div className="flex gap-3 flex-wrap">
@@ -37,7 +52,9 @@ export function MergeConflictScreen() {
               <CardTitle className="text-sm">{entry.source}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-xs font-mono break-all">{entry.password}</p>
+              <p className="text-xs font-mono break-all">
+                {showPasswords ? entry.password : '••••••••'}
+              </p>
             </CardContent>
             <CardFooter className="justify-end">
               <Button onClick={() => resolveConflict(idx, passwordIdx)}>Use this</Button>
