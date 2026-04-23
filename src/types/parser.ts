@@ -49,4 +49,10 @@ export interface MergedAccount {
   otpAuth: string | null;
   passwords: PasswordEntry[];
   hasConflict: boolean;
+  /** All original URLs contributing to this merged account (distinct, insertion order). */
+  allUrls: string[];
+  /** True when two or more distinct subdomains merged into this account (same password). */
+  isSubdomainMerge: boolean;
+  /** True when at least one merged subdomain is not in the boring set (www/mail/accounts/etc). */
+  subdomainIsInteresting: boolean;
 }

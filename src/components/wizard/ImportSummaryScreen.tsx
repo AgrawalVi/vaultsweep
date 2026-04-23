@@ -11,14 +11,19 @@ export function ImportSummaryScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const duplicatesCollapsed = rawEntries.length - mergedAccounts.length
+  const cleanMergeCount = mergedAccounts.filter(
+    a => !a.isSubdomainMerge && !a.hasConflict && a.sources.length > 1,
+  ).length
+  const subdomainReviewCount = mergedAccounts.filter(
+    a => a.isSubdomainMerge && a.subdomainIsInteresting,
+  ).length
   const conflictCount = mergedAccounts.filter(a => a.hasConflict).length
 
   const stats = [
     { label: 'Accounts found', value: rawEntries.length },
-    { label: 'After deduplication', value: mergedAccounts.length },
-    { label: 'Duplicates collapsed', value: duplicatesCollapsed },
-    { label: 'Merge conflicts', value: conflictCount },
+    { label: 'Clean merges collapsed', value: cleanMergeCount },
+    { label: 'Subdomain merges to review', value: subdomainReviewCount },
+    { label: 'Conflicts to resolve', value: conflictCount },
   ]
 
   return (

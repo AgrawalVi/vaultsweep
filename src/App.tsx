@@ -26,19 +26,30 @@ const IS_DEBUG_CSV = window.location.hash === '#debug-csv'
 function App() {
   const step = useWizardStore(s => s.step)
   const rawEntries = useWizardStore(s => s.rawEntries)
+  const mergedAccounts = useWizardStore(s => s.mergedAccounts)
 
-  // Bridge: emit raw entries to debug windows whenever they change
+  // Bridge: emit raw entries and merged accounts to debug windows whenever they change
   useEffect(() => {
     emit('debug:raw-entries-updated', { entries: rawEntries }).catch(() => {})
   }, [rawEntries])
 
-  // Bridge: respond to debug windows requesting the current entries
   useEffect(() => {
-    const unlisten = listen('debug:request-raw-entries', () => {
+    emit('debug:merged-accounts-updated', { accounts: mergedAccounts }).catch(() => {})
+  }, [mergedAccounts])
+
+  // Bridge: respond to debug windows requesting the current data
+  useEffect(() => {
+    const unlistenEntries = listen('debug:request-raw-entries', () => {
       emit('debug:raw-entries-updated', { entries: rawEntries }).catch(() => {})
     })
-    return () => { unlisten.then(u => u()) }
-  }, [rawEntries])
+    const unlistenAccounts = listen('debug:request-merged-accounts', () => {
+      emit('debug:merged-accounts-updated', { accounts: mergedAccounts }).catch(() => {})
+    })
+    return () => {
+      unlistenEntries.then(u => u())
+      unlistenAccounts.then(u => u())
+    }
+  }, [rawEntries, mergedAccounts])
 
   // Cmd+Shift+D opens the CSV debug window
   useEffect(() => {

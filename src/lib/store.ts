@@ -165,11 +165,23 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
     const conflicts = mergedAccounts.filter(a => a.hasConflict)
     const updatedResolutions = { ...conflictResolutions, [accountIdx]: passwordIdx }
     const next = mergeConflictIndex + 1
-    set({ conflictResolutions: updatedResolutions })
+
     if (next >= conflicts.length) {
+      // Last conflict resolved — collapse every conflicted account to its chosen password
+      // so triage sees a flat, resolved list.
+      const resolved = mergedAccounts.map((account, idx) => {
+        if (!account.hasConflict) return account
+        const chosen = updatedResolutions[idx] ?? 0
+        return {
+          ...account,
+          passwords: [account.passwords[chosen]],
+          hasConflict: false,
+        }
+      })
+      set({ conflictResolutions: updatedResolutions, mergedAccounts: resolved })
       advance()
     } else {
-      set({ mergeConflictIndex: next })
+      set({ conflictResolutions: updatedResolutions, mergeConflictIndex: next })
     }
   },
 
