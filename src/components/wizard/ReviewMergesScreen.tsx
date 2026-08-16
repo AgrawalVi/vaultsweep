@@ -161,9 +161,9 @@ export function ReviewMergesScreen() {
         )}
       </div>
 
-      <div className="flex flex-col gap-2 overflow-auto">
+      <div className="overflow-auto flex-1 min-h-0 divide-y divide-border ring-1 ring-foreground/10">
         {visible.length === 0 && (
-          <p className="text-xs text-muted-foreground">Nothing to show with the current filter.</p>
+          <p className="text-xs text-muted-foreground p-3">Nothing to show with the current filter.</p>
         )}
         {visible.map(row => (
           <ReviewRow
@@ -235,7 +235,7 @@ function ReviewRow({
   const isSingleRow = row.urls.length === 1
 
   return (
-    <Card className={isSplitOff ? 'bg-muted/40' : ''}>
+    <Card className={`ring-0 ${isSplitOff ? 'bg-muted/40' : ''}`}>
       <CardContent className="flex flex-col gap-3 py-3">
         <div className="flex items-center gap-3">
           {selectableInRegroup && (
@@ -245,10 +245,17 @@ function ReviewRow({
               aria-label="Select for regroup"
             />
           )}
-          <button
-            type="button"
+          <div
+            role="button"
+            tabIndex={0}
             onClick={onToggleExpand}
-            className="flex-1 text-left flex items-center gap-3"
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onToggleExpand()
+              }
+            }}
+            className="flex-1 text-left flex items-center gap-3 cursor-pointer"
           >
             <div className="flex flex-col min-w-0 flex-1">
               <div className="flex items-center gap-2">
@@ -288,7 +295,7 @@ function ReviewRow({
                 className={expanded ? 'rotate-180 transition-transform' : 'transition-transform'}
               />
             )}
-          </button>
+          </div>
         </div>
 
         {expanded && !isSingleRow && (
