@@ -31,5 +31,26 @@ url = "2"
 psl = "2"
 tauri-plugin-dialog = "2"
 
+# HTTP for the HIBP range API and the local Ollama server.
+# TLS backend is native-tls (Security.framework on macOS, SChannel on Windows).
+# reqwest 0.13's `default-tls` means *rustls*, which pulls aws-lc-rs and needs
+# cmake — hence default-features = false and the defaults restored by hand.
+# NOTE: reqwest 0.13 renamed the 0.12 feature `rustls-tls` to `rustls`; there is
+# no `native-tls` equivalent rename, but do check the manifest before bumping.
+# `system-proxy` is kept so HIBP works behind a corporate proxy; the Ollama
+# client calls `.no_proxy()` so loopback is never hijacked.
+reqwest = { version = "0.13", default-features = false, features = [
+    "json",
+    "http2",
+    "charset",
+    "system-proxy",
+    "native-tls",
+] }
+tokio = { version = "1", features = ["rt", "sync", "time"] }
+sha1 = "0.10"
+hex = "0.4"
+async-trait = "0.1"
+
 [dev-dependencies]
 tempfile = "3"
+tokio = { version = "1", features = ["rt", "macros", "test-util"] }

@@ -2,6 +2,11 @@ pub mod commands;
 pub mod parsers;
 pub mod merger;
 
+// THROWAWAY — step 0 TLS verification. Remove together with `tls_smoke.rs`
+// once `hibp/` lands in step 1.
+#[cfg(test)]
+mod tls_smoke;
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)

@@ -111,3 +111,35 @@ check is a plain substring search. The Rust log-capture test installs one global
 `tracing` subscriber for the whole test binary (thread-local `set_default` raced
 under parallel tests), which also means every test in that binary is covered by
 the no-sentinel assertion.
+
+## LLM categorization + HIBP breach checks
+
+### HTTP client: reqwest with the `native-tls` backend
+
+reqwest 0.13.2 was already in `Cargo.lock` transitively via tauri, but with no
+TLS backend resolved at all — any HTTPS request would have failed at
+client-build time with an opaque error. Adding it as an explicit dependency
+forces the choice.
+
+Two naming traps worth recording, because both silently produce the wrong
+thing:
+
+1. **`rustls-tls` does not exist in 0.13.** That was the 0.12 name. The 0.13
+   features are `rustls`, `rustls-no-provider`, and `native-tls` (plus
+   `-vendored` / `-no-alpn` variants).
+2. **`default-tls` means rustls in 0.13**, the reverse of 0.12 where it meant
+   native-tls. Taking the default here would have been a silent switch of
+   crypto stack.
+
+Chose `native-tls`: on macOS it is Security.framework, so no new system
+dependencies and no bundle growth. The `rustls` feature pulls `aws-lc-rs`,
+whose build script requires `cmake` — not installed on the dev machine, and an
+avoidable install step for a macOS-first app. Cost of this choice is that a
+Linux build would need OpenSSL dev headers; revisit if Linux packaging happens.
+
+Declared with `default-features = false` and the remaining 0.13 defaults
+restored by hand (`http2`, `charset`, `system-proxy`) plus `json`.
+`system-proxy` is deliberately kept so HIBP still works behind a corporate
+proxy; the Ollama client instead calls `.no_proxy()` so a proxy can never
+hijack a loopback request. `stream` is *not* enabled — NDJSON reading for
+`/api/pull` uses the inherent `Response::chunk()`, which needs no feature.
