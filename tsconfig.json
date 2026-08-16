@@ -19,6 +19,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
+
+    /* jest-dom matchers are augmented via the `/vitest` import in
+       src/test/setup.ts — do not add it here, its bare entry declares Jest globals. */
+    "types": ["vitest/globals", "node"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
