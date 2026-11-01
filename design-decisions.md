@@ -143,3 +143,27 @@ restored by hand (`http2`, `charset`, `system-proxy`) plus `json`.
 proxy; the Ollama client instead calls `.no_proxy()` so a proxy can never
 hijack a loopback request. `stream` is *not* enabled — NDJSON reading for
 `/api/pull` uses the inherent `Response::chunk()`, which needs no feature.
+
+### k-anonymity enforced by the `RangeSource` signature, plus a fail-closed guard
+
+`RangeSource::fetch_range(&self, prefix: &str)` is the only way out to the
+network, and its one argument is the 5-char prefix. Nothing downstream of
+`check_password` is ever handed the suffix, the full digest, or the password,
+so invariant 4 is structural rather than a convention someone has to remember.
+
+`HibpRangeClient::fetch_range` additionally re-checks that its argument is
+exactly 5 ASCII hex characters and refuses otherwise. Redundant today by
+construction — the point is that if someone later widens the seam, the request
+fails closed instead of quietly leaking the extra characters.
+
+`HashSplit` holds the completing half of the digest, so it is treated as
+credential-adjacent even though it is not a password: `ZeroizeOnDrop`, and a
+hand-written `Debug` that prints the prefix but redacts the suffix. A full
+SHA-1 of a password is offline-crackable; the prefix alone is not.
+
+### A count of zero means "not breached"
+
+With `Add-Padding: true` the response carries invented suffixes with a count of
+`0`, so a match is only a breach when the count is greater than zero. Also note
+`count` is an *occurrence count across the corpus*, not a number of breached
+sites — see C4 in the plan for why the user-facing copy must not conflate them.
