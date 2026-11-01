@@ -37,6 +37,7 @@ export function ReviewMergesScreen() {
     undoReview,
     commitReview,
     skipReview,
+    keepAllReview,
     back,
   } = useWizardStore()
 
@@ -49,6 +50,16 @@ export function ReviewMergesScreen() {
     [reviewAccounts],
   )
   const visible = reviewShowAll ? reviewAccounts : interesting
+
+  const groups = useMemo(() => {
+    const byDomain = new Map<string, ReviewAccount[]>()
+    for (const r of visible) {
+      const list = byDomain.get(r.domain)
+      if (list) list.push(r)
+      else byDomain.set(r.domain, [r])
+    }
+    return [...byDomain.entries()].sort(([a], [b]) => a.localeCompare(b))
+  }, [visible])
 
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [urlSelection, setUrlSelection] = useState<Record<string, Set<string>>>({})
@@ -165,7 +176,15 @@ export function ReviewMergesScreen() {
         {visible.length === 0 && (
           <p className="text-xs text-muted-foreground p-3">Nothing to show with the current filter.</p>
         )}
-        {visible.map(row => (
+        {groups.map(([domain, rows]) => (
+          <section key={domain}>
+            <h3 className="sticky top-0 z-10 bg-background px-3 py-1.5 text-xs font-semibold border-b">
+              {domain}
+              <span className="ml-2 font-normal text-muted-foreground">
+                {rows.length} {rows.length === 1 ? 'account' : 'accounts'}
+              </span>
+            </h3>
+            {rows.map(row => (
           <ReviewRow
             key={row.id}
             row={row}
@@ -190,14 +209,16 @@ export function ReviewMergesScreen() {
             }}
           />
         ))}
+          </section>
+        ))}
       </div>
 
       <Separator />
 
       <div className="flex gap-2">
         <Button variant="outline" onClick={back}>Back</Button>
-        <Button variant="ghost" onClick={skipReview} className="ml-auto">
-          Skip this step
+        <Button variant="ghost" onClick={keepAllReview} className="ml-auto">
+          Keep all merged
         </Button>
         <Button onClick={commitReview}>Continue</Button>
       </div>
@@ -259,14 +280,13 @@ function ReviewRow({
           >
             <div className="flex flex-col min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium truncate">{row.domain}</span>
+                <span className="text-sm font-medium truncate">{row.username || '(no username)'}</span>
                 {isSplitOff && (
                   <span className="text-[10px] uppercase tracking-wide text-muted-foreground border px-1.5 py-0.5">
                     split off
                   </span>
                 )}
               </div>
-              <span className="text-xs text-muted-foreground truncate">{row.username || '(no username)'}</span>
             </div>
 
             {!isSingleRow && (
@@ -275,8 +295,8 @@ function ReviewRow({
               </span>
             )}
 
-            <div className="flex gap-1 max-w-[40%] overflow-hidden">
-              {row.urls.slice(0, 3).map(u => (
+            <div className="flex flex-wrap justify-end gap-1 max-w-[50%]">
+              {row.urls.map(u => (
                 <span
                   key={u}
                   className="text-[11px] border px-1.5 py-0.5 truncate max-w-[120px]"
@@ -285,9 +305,6 @@ function ReviewRow({
                   {subdomainChip(u, row.domain)}
                 </span>
               ))}
-              {row.urls.length > 3 && (
-                <span className="text-[11px] text-muted-foreground">+{row.urls.length - 3}</span>
-              )}
             </div>
             {!isSingleRow && (
               <ChevronDown
