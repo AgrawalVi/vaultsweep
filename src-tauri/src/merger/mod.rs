@@ -96,11 +96,12 @@ pub(crate) fn normalize_domain(url_str: Option<&str>) -> String {
         None => return "no-domain".to_string(),
     };
 
-    let host = Url::parse(url_str)
+    let Some(host) = Url::parse(url_str)
         .ok()
-        .and_then(|u| u.host_str().map(str::to_lowercase));
-
-    let host = host.unwrap_or_else(|| return "no-domain".to_string());
+        .and_then(|u| u.host_str().map(str::to_lowercase))
+    else {
+        return "no-domain".to_string();
+    };
 
     psl::domain(host.as_bytes())
         .and_then(|d| std::str::from_utf8(d.as_bytes()).ok().map(str::to_string))

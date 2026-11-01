@@ -4,6 +4,7 @@ Guidance for Claude Code when working in this repo.
 
 Product spec: `vaultsweep.md` (authoritative — read it before designing UX flows).
 Decision log: `design-decisions.md` (append non-obvious choices here, don't rewrite).
+Task tracking: **Linear** (workspace `vaultsweep`, team `VAU`) via the Linear MCP. It is the single source of truth for status, plans, and bugs — don't write plan/status files in the repo or `~/.claude/plans`. Check Linear before starting work, put implementation plans in issue descriptions, move issues through Todo → In Progress → Done as work lands, and file bugs found along the way as `Bug`-labeled issues. Name branches with the issue's `gitBranchName`.
 
 ## What this app is
 
@@ -26,10 +27,11 @@ When in doubt, qualify: "Session Phase 2" vs "Architecture Phase 2".
 pnpm tauri dev                    # Full app with hot reload
 pnpm tauri build                  # Signed bundle
 
-pnpm test                         # Vitest (unit)
+pnpm test                         # Vitest, single run (pnpm test:watch for watch mode)
 cargo test --manifest-path src-tauri/Cargo.toml
+cargo test --manifest-path src-tauri/Cargo.toml -- --ignored   # Rust known-bug list
 
-pnpm lint
+# pnpm lint is not wired up yet (no ESLint installed) — tracked in Linear VAU-27
 cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 
 pnpm dlx shadcn@latest add <component>
@@ -126,7 +128,12 @@ Skip semantics: auto-split *interesting* merges, keep boring ones collapsed. Def
 
 **State management**: Zustand. One store (`src/lib/store.ts`) for the wizard. No Redux.
 
-**Testing**: Vitest for unit, Playwright for e2e. Rust merger + parsers have `#[cfg(test)]` module tests — extend them when changing grouping logic.
+**Testing**:
+- Frontend: Vitest + Testing Library (jsdom). Tests are colocated in `src/` as `*.test.ts(x)` so `tsc` typechecks them. Config is standalone in `vitest.config.ts` (not `vite.config.ts`). Fixture builders live in `src/test/factories.ts`; `SENTINEL_PASSWORD` is the greppable password used by leak assertions.
+- Pure wizard logic lives in `src/lib/wizard-logic.ts` and is tested without a DOM or store; `store.test.ts` covers orchestration only and mocks `@/lib/tauri`.
+- Rust: inline `#[cfg(test)]` modules for parsers + merger (extend them when changing grouping logic); integration tests in `src-tauri/tests/` (`parse_pipeline.rs`, `security.rs`) driven by CSVs in `src-tauri/tests/fixtures/`. `merge()` output order is not deterministic — sort or look up by key, never index.
+- Known bugs are encoded, not skipped: `it.fails` in Vitest, `#[ignore = "bug: …"]` in Rust. When you fix one, the marker goes red — flip it to a normal test.
+- Playwright is not installed (Tauri e2e needs `tauri-driver`).
 
 **shadcn**: Do not modify `src/components/ui/`. Custom wrappers go in `src/components/ui-vaultsweep/` so `pnpm dlx shadcn@latest add` keeps working. Installed components: button, card, dialog, input, radio-group, checkbox, label, accordion, separator, plus `cmdk` for the command palette.
 
