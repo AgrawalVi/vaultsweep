@@ -96,6 +96,7 @@ interface WizardStore {
   undoReview: () => void
   commitReview: () => void
   skipReview: () => void
+  keepAllReview: () => void
 
   decideTriage: (d: 'keep' | 'delete' | 'skip') => void
 }
@@ -306,6 +307,11 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
     const untouched = mergedAccounts.filter(a => !a.isSubdomainMerge)
     set({ mergedAccounts: [...untouched, ...reshaped] })
     advance()
+  },
+
+  keepAllReview: () => {
+    // Keep every merge exactly as the merger produced it; discard any splits made here.
+    get().advance()
   },
 
   skipReview: () => {

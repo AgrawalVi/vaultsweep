@@ -84,7 +84,7 @@ describe('ReviewMergesScreen', () => {
     expect(screen.getByText('hidden.com')).toBeInTheDocument()
   })
 
-  it('shows a subdomain chip per url and a count once past three', () => {
+  it('shows a chip for every subdomain, plus the combined count', () => {
     useWizardStore.setState({
       reviewAccounts: [
         makeReviewAccount({
@@ -100,8 +100,7 @@ describe('ReviewMergesScreen', () => {
     render(<ReviewMergesScreen />)
     expect(screen.getByText('one')).toBeInTheDocument()
     expect(screen.getByText('three')).toBeInTheDocument()
-    expect(screen.queryByText('four')).not.toBeInTheDocument()
-    expect(screen.getByText('+1')).toBeInTheDocument()
+    expect(screen.getByText('four')).toBeInTheDocument()
     expect(screen.getByText('4 combined')).toBeInTheDocument()
   })
 
@@ -110,7 +109,7 @@ describe('ReviewMergesScreen', () => {
     useWizardStore.setState({ reviewAccounts: [makeReviewAccount({ id: 'r1' })] })
     const { container } = render(<ReviewMergesScreen />)
 
-    await user.click(screen.getByText('example.com'))
+    await user.click(screen.getByText('user@example.com'))
     expect(container.textContent).not.toContain(SENTINEL_PASSWORD)
 
     await user.click(screen.getByRole('button', { name: /Show passwords/ }))
@@ -122,7 +121,7 @@ describe('ReviewMergesScreen', () => {
     useWizardStore.setState({ reviewAccounts: [makeReviewAccount({ id: 'r1' })] })
     render(<ReviewMergesScreen />)
 
-    await user.click(screen.getByText('example.com'))
+    await user.click(screen.getByText('user@example.com'))
     await user.click(screen.getByRole('button', { name: 'Split all apart' }))
 
     expect(get().reviewAccounts).toHaveLength(2)
@@ -142,7 +141,7 @@ describe('ReviewMergesScreen', () => {
     })
     render(<ReviewMergesScreen />)
 
-    await user.click(screen.getByText('example.com'))
+    await user.click(screen.getByText('user@example.com'))
     await user.click(screen.getByLabelText('Select https://b.example.com'))
     await user.click(screen.getByRole('button', { name: 'Split selected' }))
 
@@ -160,7 +159,7 @@ describe('ReviewMergesScreen', () => {
       ],
     })
     render(<ReviewMergesScreen />)
-    await user.click(screen.getByText('example.com'))
+    await user.click(screen.getByText('user@example.com'))
 
     expect(screen.getByRole('button', { name: 'Split selected' })).toBeDisabled()
 
@@ -224,7 +223,7 @@ describe('ReviewMergesScreen', () => {
 
     expect(screen.getByRole('button', { name: /Undo/ })).toBeDisabled()
 
-    await user.click(screen.getByText('example.com'))
+    await user.click(screen.getByText('user@example.com'))
     await user.click(screen.getByRole('button', { name: 'Split all apart' }))
     expect(get().reviewAccounts).toHaveLength(2)
 
@@ -246,18 +245,31 @@ describe('ReviewMergesScreen', () => {
     expect(get().mergedAccounts.map(a => a.normalizedDomain)).toEqual(['plain.com', 'example.com'])
   })
 
-  it('skip splits interesting merges apart rather than committing them', async () => {
+  it('keep all merged advances without splitting, even for interesting merges', async () => {
     const user = userEvent.setup()
     useWizardStore.setState({
       step: 'review-merges',
       mergedAccounts: [makeSubdomainMerge({ subdomainIsInteresting: true })],
     })
     render(<ReviewMergesScreen />)
-    await user.click(screen.getByRole('button', { name: 'Skip this step' }))
+    await user.click(screen.getByRole('button', { name: 'Keep all merged' }))
 
     expect(get().step).toBe('triage-card')
-    expect(get().mergedAccounts).toHaveLength(2)
-    expect(get().mergedAccounts.every(a => !a.isSubdomainMerge)).toBe(true)
+    expect(get().mergedAccounts).toHaveLength(1)
+    expect(get().mergedAccounts[0].isSubdomainMerge).toBe(true)
+  })
+
+  it('groups accounts under a single header per top-level domain', () => {
+    useWizardStore.setState({
+      step: 'review-merges',
+      mergedAccounts: [
+        makeSubdomainMerge({ subdomainIsInteresting: true, username: 'a@x.com' }),
+        makeSubdomainMerge({ subdomainIsInteresting: true, username: 'b@x.com' }),
+      ],
+    })
+    render(<ReviewMergesScreen />)
+    expect(screen.getAllByRole('heading', { level: 3, name: /example\.com/ })).toHaveLength(1)
+    expect(screen.getByText(/2 accounts/)).toBeInTheDocument()
   })
 
   // The "Nothing to show with the current filter." branch is unreachable: `visible` is
@@ -287,7 +299,7 @@ describe('ReviewMergesScreen', () => {
       reviewAccounts: [makeReviewAccount({ id: 'r1', urls: ['https://only.example.com'] })],
     })
     render(<ReviewMergesScreen />)
-    await user.click(screen.getByText('example.com'))
+    await user.click(screen.getByText('user@example.com'))
     expect(screen.queryByRole('button', { name: 'Split all apart' })).not.toBeInTheDocument()
   })
 
@@ -305,13 +317,13 @@ describe('ReviewMergesScreen', () => {
   it('keeps each row self-contained', () => {
     useWizardStore.setState({
       reviewAccounts: [
-        makeReviewAccount({ id: 'r1', domain: 'first.com', urls: ['https://one.first.com', 'https://two.first.com'] }),
-        makeReviewAccount({ id: 'r2', domain: 'second.com', urls: ['https://one.second.com'] }),
+        makeReviewAccount({ id: 'r1', domain: 'first.com', username: 'u1', urls: ['https://one.first.com', 'https://two.first.com'] }),
+        makeReviewAccount({ id: 'r2', domain: 'second.com', username: 'u2', urls: ['https://one.second.com'] }),
       ],
     })
     render(<ReviewMergesScreen />)
-    const card = screen.getByText('first.com').closest<HTMLElement>('[data-slot="card"]')!
+    const card = screen.getByText('u1').closest<HTMLElement>('[data-slot="card"]')!
     expect(within(card).getByText('2 combined')).toBeInTheDocument()
-    expect(within(card).queryByText('second.com')).not.toBeInTheDocument()
+    expect(within(card).queryByText('u2')).not.toBeInTheDocument()
   })
 })
