@@ -392,6 +392,25 @@ describe('regroup', () => {
     expect(out.some(r => r.id === 'other')).toBe(true)
   })
 
+  it('puts the combined row where the first targeted row was', () => {
+    // Targets are non-adjacent with untargeted rows on both sides. `firstIdx` is
+    // computed on the unfiltered array, but no targeted row can precede the first
+    // targeted row, so the index is still valid after filtering.
+    const rows = [
+      makeReviewAccount({ id: 'before', domain: 'before.com' }),
+      makeReviewAccount({ id: 's1', urls: ['https://one.example.com'], origin: 'split' }),
+      makeReviewAccount({ id: 'between', domain: 'between.com' }),
+      makeReviewAccount({ id: 's2', urls: ['https://two.example.com'], origin: 'split' }),
+      makeReviewAccount({ id: 'after', domain: 'after.com' }),
+    ]
+    const ids = regroup(rows, ['s1', 's2'], 7)!.map(r => r.id)
+    expect(ids).toHaveLength(4)
+    expect(ids[0]).toBe('before')
+    expect(ids[2]).toBe('between')
+    expect(ids[3]).toBe('after')
+    expect(ids[1]).toContain('7')
+  })
+
   it('inherits title, sources and passwords from the first targeted row', () => {
     const rows = twoSplits()
     rows[0].title = 'First'

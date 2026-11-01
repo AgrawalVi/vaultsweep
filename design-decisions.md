@@ -84,3 +84,30 @@ we standardize on Accordion across screens), `label`. No custom theming.
 Per product direction, component tests for the two screens are intentionally
 not included in this pass. The Rust merger tests were updated to cover the new
 `url` field.
+
+## Test harness
+
+### Pure wizard logic extracted to `src/lib/wizard-logic.ts`
+
+The store's transforms (conflict resolution, review split/regroup, upload naming,
+source rewriting) were module-private, so the densest logic in the repo was
+untestable. They now live in `wizard-logic.ts` as exported pure functions and the
+store actions are thin `set()` wrappers. `regroup` takes an `idSeed` instead of
+calling `Date.now()` so it is deterministic under test; the store passes the clock.
+
+### Known bugs are encoded as tests, not skipped
+
+A known defect gets a test that asserts the *correct* behavior, marked `it.fails`
+(Vitest) or `#[ignore = "bug: …"]` (Rust). The suite stays green while the bug
+exists and the marker turns red the moment someone fixes it — at which point it
+becomes an ordinary test. Each marker names its Linear issue.
+
+This supersedes the "Tests deferred" note above.
+
+### Leak assertions use one greppable sentinel
+
+Rust and TS tests both use `ZZ-SENTINEL-9137` as the planted password, so a leak
+check is a plain substring search. The Rust log-capture test installs one global
+`tracing` subscriber for the whole test binary (thread-local `set_default` raced
+under parallel tests), which also means every test in that binary is covered by
+the no-sentinel assertion.

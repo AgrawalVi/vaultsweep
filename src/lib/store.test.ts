@@ -8,6 +8,7 @@ import {
   makeReviewAccount,
   makeSubdomainMerge,
   makeUpload,
+  SENTINEL_PASSWORD,
 } from '@/test/factories'
 
 // `@/lib/tauri` is the whole Tauri boundary for the store — mocking it means these
@@ -404,5 +405,21 @@ describe('security invariants', () => {
 
     expect(setItem).not.toHaveBeenCalled()
     setItem.mockRestore()
+  })
+
+  // Known gap (Linear VAU-25): security invariant 5 says JS passwords are cleared as
+  // soon as they are no longer needed, but the store keeps plaintext in
+  // rawMergedAccounts / mergedAccounts / discardedAccounts / reviewAccounts and every
+  // reviewUndoStack snapshot until reset(). Marked `it.fails`: it passes while the gap
+  // exists and turns red once the store stops holding plaintext — flip it to `it` then.
+  it.fails('holds no plaintext password once triage is complete', () => {
+    useWizardStore.setState({
+      step: 'triage-card',
+      rawMergedAccounts: [makeMergedAccount()],
+      mergedAccounts: [makeMergedAccount()],
+    })
+    get().decideTriage('keep')
+    expect(get().step).toBe('triage-complete')
+    expect(JSON.stringify(get())).not.toContain(SENTINEL_PASSWORD)
   })
 })
