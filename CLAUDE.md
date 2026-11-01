@@ -29,7 +29,7 @@ pnpm tauri build                  # Signed bundle
 
 pnpm test                         # Vitest, single run (pnpm test:watch for watch mode)
 cargo test --manifest-path src-tauri/Cargo.toml
-cargo test --manifest-path src-tauri/Cargo.toml -- --ignored   # Rust known-bug list
+cargo test --manifest-path src-tauri/Cargo.toml -- --ignored   # known-bug markers + network tests (live HIBP)
 
 # pnpm lint is not wired up yet (no ESLint installed) — tracked in Linear VAU-27
 cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings

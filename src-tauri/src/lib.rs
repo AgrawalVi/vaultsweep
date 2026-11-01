@@ -1,6 +1,7 @@
 pub mod commands;
 pub mod parsers;
 pub mod merger;
+pub mod hibp;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
