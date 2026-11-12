@@ -38,14 +38,6 @@ impl fmt::Debug for RawEntry {
 #[derive(Debug, thiserror::Error)]
 /// Errors that can occur when parsing a password CSV file.
 pub enum ParseError {
-    /// An error that can occur when reading a password CSV file, usually due to a file not found or permissions issue.
-    #[error("IO error reading {path}: {source}")]
-    IoError {
-        path: std::path::PathBuf,
-        #[source]
-        source: std::io::Error,
-    },
-
     /// An error that can occur when parsing a password CSV file, usually due to a malformed file.
     #[error("CSV parse error at {path}: {source}")]
     CsvError {
