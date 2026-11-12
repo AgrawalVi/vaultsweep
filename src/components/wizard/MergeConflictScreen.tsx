@@ -38,10 +38,14 @@ export function MergeConflictScreen() {
   const [showPasswords, setShowPasswords] = useState(false)
 
   // Reset per-conflict local state whenever the visible conflict changes.
-  useEffect(() => {
+  // Done during render rather than in an effect so the new conflict never
+  // renders with the previous one's choice.
+  const [shownConflict, setShownConflict] = useState(current?.i)
+  if (current?.i !== shownConflict) {
+    setShownConflict(current?.i)
     setAction('combine')
     setChosenPasswordIdx(0)
-  }, [current?.i])
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
