@@ -44,7 +44,7 @@ cargo test --manifest-path src-tauri/Cargo.toml    # backend (Rust)
 
 ### Debug window
 
-Press **Cmd+Shift+D** in the running app to open a debug window showing the raw imported entries and merged accounts.
+Press **Cmd+Shift+D** in the running app to open a debug window showing the raw imported entries and merged accounts. It is only available under `pnpm tauri dev`; release builds leave it out because it shows plaintext passwords.
 
 ## Recommended IDE setup
 

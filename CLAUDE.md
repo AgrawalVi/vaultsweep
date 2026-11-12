@@ -41,7 +41,7 @@ ollama serve                      # pull gemma4:e4b first
 op --version                      # 1Password CLI, must be signed in
 ```
 
-Debug: **Cmd+Shift+D** opens a separate Tauri webview window (`CsvEntriesDebug`) that mirrors `rawEntries` and `mergedAccounts` over Tauri events. Useful for inspecting the merger output without touching the wizard UI.
+Debug (dev builds only): **Cmd+Shift+D** opens a separate Tauri webview window (`CsvEntriesDebug`) that mirrors `rawEntries` and `mergedAccounts` over Tauri events via `DebugBridge`. Useful for inspecting the merger output without touching the wizard UI. Both are gated on `import.meta.env.DEV` in `App.tsx` because the payloads hold plaintext passwords — keep them out of release bundles.
 
 ## Architecture
 
@@ -60,7 +60,7 @@ src/
   components/
     wizard/               # Welcome → ConnectSources → ImportSummary →
                           # MergeConflict → ReviewMerges → TriageCard → TriageComplete
-    debug/                # CsvEntriesDebug (Cmd+Shift+D window)
+    debug/                # CsvEntriesDebug (Cmd+Shift+D window) + DebugBridge, dev builds only
     shell/                # AppShell
     ui/                   # shadcn base (do not modify)
     ui-vaultsweep/        # Custom wrappers (empty for now; put overrides here)
