@@ -12,6 +12,7 @@
 //! accept. It has no field a password could travel in. Widening it is a
 //! review-blocking change.
 
+pub mod client;
 pub mod prompts;
 
 use serde::{Deserialize, Serialize};

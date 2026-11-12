@@ -1,3 +1,4 @@
+pub mod llm;
 pub mod parser;
 
 use serde::{Deserialize, Serialize};
