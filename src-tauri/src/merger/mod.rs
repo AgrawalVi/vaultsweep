@@ -6,7 +6,7 @@ use std::fmt;
 use url::Url;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use crate::parsers::RawEntry;
+use crate::parsers::{redacted_opt, RawEntry};
 use boring_subdomains::BORING_SUBDOMAIN_LABELS;
 
 #[derive(Zeroize, ZeroizeOnDrop, Serialize, Clone)]
@@ -30,8 +30,8 @@ impl fmt::Debug for PasswordEntry {
     }
 }
 
-// Debug is safe to derive: passwords are Vec<PasswordEntry>, whose own Debug redacts the password field.
-#[derive(Debug, Zeroize, ZeroizeOnDrop, Serialize, Clone)]
+// WARNING: Do not derive Debug — notes and otp_auth must remain REDACTED.
+#[derive(Zeroize, ZeroizeOnDrop, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct MergedAccount {
     pub normalized_domain: String,
@@ -50,6 +50,25 @@ pub struct MergedAccount {
     /// True when at least one of the merged subdomains is "interesting" (not in the boring set).
     /// Only meaningful when `is_subdomain_merge` is true.
     pub subdomain_is_interesting: bool,
+}
+
+impl fmt::Debug for MergedAccount {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MergedAccount")
+            .field("normalized_domain", &self.normalized_domain)
+            .field("username", &self.username)
+            .field("sources", &self.sources)
+            .field("title", &self.title)
+            .field("notes", &redacted_opt(&self.notes))
+            .field("otp_auth", &redacted_opt(&self.otp_auth))
+            // Each PasswordEntry redacts its own password.
+            .field("passwords", &self.passwords)
+            .field("has_conflict", &self.has_conflict)
+            .field("all_urls", &self.all_urls)
+            .field("is_subdomain_merge", &self.is_subdomain_merge)
+            .field("subdomain_is_interesting", &self.subdomain_is_interesting)
+            .finish()
+    }
 }
 
 /// Extract the subdomain prefix for a URL, relative to its registrable domain.
