@@ -3,10 +3,10 @@ use std::path::Path;
 use super::{find_col, open_reader, opt_str, ParseError, ParseWarning, RawEntry};
 
 /// Parse an iCloud Keychain CSV (exported from Passwords.app / Keychain Access).
-/// 
+///
 /// Full header row exported by iCloud:
 /// Title,URL,Username,Password,Notes,OTPAuth
-/// 
+///
 /// Only Title, URL, Username, Password, and Notes are required. NOTE: OTP Auth is optional
 pub fn parse_icloud(path: &Path) -> Result<(Vec<RawEntry>, Vec<ParseWarning>), ParseError> {
     let (mut rdr, headers) = open_reader(path, false)?;
@@ -166,9 +166,7 @@ mod tests {
     #[test]
     fn test_parse_icloud_missing_otpauth_column_ok() {
         // Older iCloud exports (pre-Sonoma) don't include the OTPAuth column.
-        let f = write_csv(
-            "Title,URL,Username,Password,Notes\nSite,https://a.com,u,hunter2,\n",
-        );
+        let f = write_csv("Title,URL,Username,Password,Notes\nSite,https://a.com,u,hunter2,\n");
         let (entries, warnings) = parse_icloud(f.path()).unwrap();
         assert_eq!(entries.len(), 1);
         assert!(warnings.is_empty());
