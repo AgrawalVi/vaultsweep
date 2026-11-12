@@ -82,3 +82,23 @@ jobs:
       - name: pnpm audit
         if: ${{ !cancelled() }}
         run: pnpm audit --prod --audit-level high
+
+  build-check:
+    name: build-check
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Release build of the app binary without bundling or signing. Catches
+      # tauri.conf.json, capability and command-registration breakage.
+      - run: pnpm tauri build --no-bundle
