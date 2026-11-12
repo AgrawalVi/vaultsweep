@@ -167,3 +167,29 @@ With `Add-Padding: true` the response carries invented suffixes with a count of
 `0`, so a match is only a breach when the count is greater than zero. Also note
 `count` is an *occurrence count across the corpus*, not a number of breached
 sites — see C4 in the plan for why the user-facing copy must not conflate them.
+
+### `PromptInput` is the only door to the model, and it is closed by construction
+
+Invariant 3 is enforced the same way as invariant 4: by a type, not a
+convention. Every prompt builder in `llm/prompts.rs` takes a `PromptInput`,
+which holds a domain and an optional username and nothing else. Its fields are
+private, so the only way to build one is `PromptInput::new`, which flattens
+each field to one line of at most 120 characters. That bounds the user prompt
+(two lines, under 300 characters) and stops a CSV field containing newlines
+from forging extra prompt lines.
+
+There is deliberately no `From<&MergedAccount>` — a conversion that takes the
+whole account is one refactor away from reading the wrong field.
+
+### Model replies are repaired, not rejected
+
+`AccountAnalysis::from_model_json` errors only when the reply is not a JSON
+object. An unknown category becomes `Other`, an out-of-range score is clamped
+to 1–5, a missing one becomes 3 ("can't tell"), and the reason is squeezed to
+one line of 140 characters. The analysis is a hint on a triage card; losing it
+entirely over a cosmetic slip would cost more than showing a slightly-off one.
+Ollama's `format` schema should make all of this unreachable, but the client
+is meant to be swappable to models where that constraint is weaker.
+
+Category tokens and JSON keys are camelCase (`workSaas`, `likelyStillInUse`)
+on both the model side and the frontend side, so one serde shape covers both.
