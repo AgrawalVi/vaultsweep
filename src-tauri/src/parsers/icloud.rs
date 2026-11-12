@@ -46,8 +46,10 @@ pub fn parse_icloud(path: &Path) -> Result<(Vec<RawEntry>, Vec<ParseWarning>), P
             }
         };
 
-        let password = record.get(idx_password).unwrap_or("").trim().to_string();
-        if password.is_empty() {
+        // Keep the password byte-for-byte: leading/trailing whitespace is part of it.
+        // Trim only to decide whether the cell is empty.
+        let password = record.get(idx_password).unwrap_or("").to_string();
+        if password.trim().is_empty() {
             tracing::debug!(row = row_num, "icloud: skipping row with empty password");
             warnings.push(ParseWarning {
                 source: "icloud".to_string(),
@@ -126,6 +128,19 @@ mod tests {
         );
         let (entries, warnings) = parse_icloud(f.path()).unwrap();
         assert_eq!(entries.len(), 1);
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(warnings[0].row, 2);
+    }
+
+    #[test]
+    fn test_parse_icloud_keeps_password_whitespace() {
+        let f = write_csv(
+            "Title,URL,Username,Password,Notes,OTPAuth\nSite,https://a.com,u, hunter2 ,,\nBlank,https://b.com,u,   ,,\n",
+        );
+        let (entries, warnings) = parse_icloud(f.path()).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].password, " hunter2 ");
+        // A whitespace-only cell still counts as empty.
         assert_eq!(warnings.len(), 1);
         assert_eq!(warnings[0].row, 2);
     }
