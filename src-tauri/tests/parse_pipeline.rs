@@ -23,7 +23,11 @@ fn sorted(mut accounts: Vec<MergedAccount>) -> Vec<MergedAccount> {
 }
 
 fn passwords_of(account: &MergedAccount) -> Vec<&str> {
-    account.passwords.iter().map(|p| p.password.as_str()).collect()
+    account
+        .passwords
+        .iter()
+        .map(|p| p.password.as_str())
+        .collect()
 }
 
 fn find<'a>(accounts: &'a [MergedAccount], username: &str) -> &'a MergedAccount {
@@ -37,9 +41,17 @@ fn find<'a>(accounts: &'a [MergedAccount], username: &str) -> &'a MergedAccount 
 
 #[test]
 fn icloud_valid_parses_every_row() {
-    let result = parse_csvs(vec![target(BrowserFormat::Icloud, "Safari", "icloud_valid.csv")]);
+    let result = parse_csvs(vec![target(
+        BrowserFormat::Icloud,
+        "Safari",
+        "icloud_valid.csv",
+    )]);
 
-    assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected errors: {:?}",
+        result.errors
+    );
     assert!(result.warnings.is_empty());
     assert_eq!(result.entries.len(), 3);
 
@@ -57,7 +69,11 @@ fn icloud_valid_parses_every_row() {
 
 #[test]
 fn icloud_preserves_the_otpauth_column() {
-    let result = parse_csvs(vec![target(BrowserFormat::Icloud, "Safari", "icloud_valid.csv")]);
+    let result = parse_csvs(vec![target(
+        BrowserFormat::Icloud,
+        "Safari",
+        "icloud_valid.csv",
+    )]);
     let social = &result.entries[1];
     assert_eq!(
         social.otp_auth.as_deref(),
@@ -176,15 +192,28 @@ fn firefox_skips_empty_passwords() {
 #[test]
 fn several_targets_concatenate_in_order() {
     let result = parse_csvs(vec![
-        target(BrowserFormat::Chromium, "Arc – Personal", "arc_profile_a.csv"),
+        target(
+            BrowserFormat::Chromium,
+            "Arc – Personal",
+            "arc_profile_a.csv",
+        ),
         target(BrowserFormat::Chromium, "Arc – Work", "arc_profile_b.csv"),
     ]);
 
     assert!(result.errors.is_empty());
     assert_eq!(result.entries.len(), 4);
     assert_eq!(
-        result.entries.iter().map(|e| e.source.as_str()).collect::<Vec<_>>(),
-        ["Arc – Personal", "Arc – Personal", "Arc – Work", "Arc – Work"]
+        result
+            .entries
+            .iter()
+            .map(|e| e.source.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "Arc – Personal",
+            "Arc – Personal",
+            "Arc – Work",
+            "Arc – Work"
+        ]
     );
 }
 
@@ -226,7 +255,11 @@ fn two_arc_profiles_keep_their_distinct_usernames_apart() {
     // Both profiles hold mail.example.com, under different usernames. The merger keys on
     // (registrable domain, username), so these must never collapse into one account.
     let result = parse_csvs(vec![
-        target(BrowserFormat::Chromium, "Arc – Personal", "arc_profile_a.csv"),
+        target(
+            BrowserFormat::Chromium,
+            "Arc – Personal",
+            "arc_profile_a.csv",
+        ),
         target(BrowserFormat::Chromium, "Arc – Work", "arc_profile_b.csv"),
     ]);
     let accounts = sorted(merge(result.entries));
@@ -254,9 +287,16 @@ fn the_same_account_from_two_sources_merges_and_unions_its_sources() {
     let accounts = sorted(merge(result.entries));
     let shared = find(&accounts, "user@work.example.com");
 
-    assert_eq!(shared.sources, ["Chrome", "icloud"], "both sources should be recorded");
+    assert_eq!(
+        shared.sources,
+        ["Chrome", "icloud"],
+        "both sources should be recorded"
+    );
     assert_eq!(passwords_of(shared), ["staple-battery-horse"]);
-    assert!(!shared.has_conflict, "identical passwords must not conflict");
+    assert!(
+        !shared.has_conflict,
+        "identical passwords must not conflict"
+    );
 }
 
 #[test]
@@ -279,7 +319,11 @@ fn differing_passwords_under_one_key_surface_as_a_conflict() {
     assert_eq!(pws, ["correct-horse", "hunter2"]);
 
     // Each candidate keeps the URL it was saved under, so the conflict UI can label them.
-    let urls: Vec<_> = account.passwords.iter().filter_map(|p| p.url.as_deref()).collect();
+    let urls: Vec<_> = account
+        .passwords
+        .iter()
+        .filter_map(|p| p.url.as_deref())
+        .collect();
     assert_eq!(urls.len(), 2);
     assert!(urls.contains(&"https://bank.example.com"));
 }

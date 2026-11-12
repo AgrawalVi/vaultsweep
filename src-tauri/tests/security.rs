@@ -154,7 +154,10 @@ fn the_leak_detector_catches_an_unredacted_debug_impl() {
 #[test]
 fn raw_entry_debug_redacts_the_password() {
     let rendered = format!("{:?}", sentinel_entry());
-    assert!(!rendered.contains(SENTINEL), "RawEntry Debug leaked: {rendered}");
+    assert!(
+        !rendered.contains(SENTINEL),
+        "RawEntry Debug leaked: {rendered}"
+    );
     assert!(rendered.contains("[REDACTED]"));
     // The non-secret fields should still be there, or the impl is useless for debugging.
     assert!(rendered.contains("sentinel.example.com"));
@@ -168,7 +171,10 @@ fn password_entry_debug_redacts_the_password() {
         url: Some("https://sentinel.example.com".to_string()),
     };
     let rendered = format!("{entry:?}");
-    assert!(!rendered.contains(SENTINEL), "PasswordEntry Debug leaked: {rendered}");
+    assert!(
+        !rendered.contains(SENTINEL),
+        "PasswordEntry Debug leaked: {rendered}"
+    );
     assert!(rendered.contains("[REDACTED]"));
 }
 
@@ -178,7 +184,10 @@ fn merged_account_debug_redacts_transitively() {
     // holds redacts itself. This test is what keeps that true.
     let accounts = merge_entries(vec![sentinel_entry()]);
     let rendered = format!("{accounts:?}");
-    assert!(!rendered.contains(SENTINEL), "MergedAccount Debug leaked: {rendered}");
+    assert!(
+        !rendered.contains(SENTINEL),
+        "MergedAccount Debug leaked: {rendered}"
+    );
     assert!(rendered.contains("[REDACTED]"));
 }
 
@@ -187,7 +196,10 @@ fn parse_result_debug_redacts_transitively() {
     let dir = TempDir::new().unwrap();
     let result = parse_csvs(vec![sentinel_target(sentinel_csv(&dir))]);
     let rendered = format!("{result:?}");
-    assert!(!rendered.contains(SENTINEL), "ParseResult Debug leaked: {rendered}");
+    assert!(
+        !rendered.contains(SENTINEL),
+        "ParseResult Debug leaked: {rendered}"
+    );
 }
 
 // ------------------------------------------------------------- zeroize
@@ -248,7 +260,11 @@ fn a_failed_parse_leaves_no_debris_behind() {
 
     let before = snapshot(dir.path());
     let result = parse_csvs(vec![sentinel_target(path.to_string_lossy().into_owned())]);
-    assert_eq!(result.errors.len(), 1, "the fixture should have failed to parse");
+    assert_eq!(
+        result.errors.len(),
+        1,
+        "the fixture should have failed to parse"
+    );
     assert_eq!(before, snapshot(dir.path()));
 }
 

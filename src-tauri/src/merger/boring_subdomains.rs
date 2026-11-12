@@ -72,5 +72,5 @@ pub const BORING_SUBDOMAIN_LABELS: &[&str] = &[
     "cdn",
     "assets",
     "services",
-    "verified"
+    "verified",
 ];
