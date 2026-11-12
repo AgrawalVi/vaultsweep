@@ -46,3 +46,39 @@ jobs:
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       # Never pass --ignored here: one ignored test hits the live HIBP API.
       - run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  security:
+    name: security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read # gitleaks-action lists the PR's commits
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # Every check runs even if an earlier one failed, so one run reports all.
+      - name: gitleaks
+        if: ${{ !cancelled() }}
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: false
+      - name: Debug-derive guard (invariant 6)
+        if: ${{ !cancelled() }}
+        run: scripts/check-debug-derive.sh
+      - name: cargo-deny
+        if: ${{ !cancelled() }}
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: src-tauri/Cargo.toml
+      - uses: pnpm/action-setup@v6
+        if: ${{ !cancelled() }}
+      - uses: actions/setup-node@v7
+        if: ${{ !cancelled() }}
+        with:
+          node-version-file: .node-version
+      - name: pnpm audit
+        if: ${{ !cancelled() }}
+        run: pnpm audit --prod --audit-level high

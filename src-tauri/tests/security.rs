@@ -137,6 +137,7 @@ fn sentinel_entry() -> RawEntry {
 #[test]
 fn the_leak_detector_catches_an_unredacted_debug_impl() {
     #[derive(Debug)]
+    // check-debug-derive: allow (control: this type must leak)
     #[allow(dead_code)]
     struct Unredacted {
         password: String,
