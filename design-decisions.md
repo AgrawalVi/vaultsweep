@@ -193,3 +193,25 @@ is meant to be swappable to models where that constraint is weaker.
 
 Category tokens and JSON keys are camelCase (`workSaas`, `likelyStillInUse`)
 on both the model side and the frontend side, so one serde shape covers both.
+
+### Ollama client: "not running" is a state, not an error
+
+`LlmClient::status` returns an `OllamaStatus` and cannot fail. Connection
+refused, a non-2xx from `/api/tags`, and a body that is not Ollama's all
+collapse to `Unreachable`, because the setup screen does the same thing for
+each: tell the user the helper isn't running. `classify` and `pull` do return
+`LlmError`, since their callers need to tell a timeout from a missing model.
+
+Model names are compared lowercase with the implicit `:latest` made explicit,
+so a configured `gemma4` matches an installed `gemma4:latest`. A colon before
+the last `/` is a registry port, not a tag.
+
+`/api/pull` reports failures such as an unknown model as an `{"error": …}`
+line inside a 200 stream, and reports each layer separately. Progress is the
+sum over layers, emitted once per line that changes it. A stream that ends
+without the final `success` line is a failure even if every byte arrived.
+
+Tests run against a throwaway HTTP listener on a loopback port rather than a
+mocked trait, so the request body that would reach Ollama is asserted
+byte-for-byte. The one thing that cannot be covered that way is whether a real
+model honours the `format` schema — that is the `#[ignore]`d live test.

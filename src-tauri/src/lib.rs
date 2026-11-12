@@ -19,6 +19,7 @@ pub fn run() {
             greet,
             commands::parser::parse_csvs,
             commands::parser::merge_entries,
+            commands::llm::ollama_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
