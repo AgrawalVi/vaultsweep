@@ -42,8 +42,10 @@ pub fn parse_chromium(
             }
         };
 
-        let password = record.get(idx_password).unwrap_or("").trim().to_string();
-        if password.is_empty() {
+        // Keep the password byte-for-byte: leading/trailing whitespace is part of it.
+        // Trim only to decide whether the cell is empty.
+        let password = record.get(idx_password).unwrap_or("").to_string();
+        if password.trim().is_empty() {
             tracing::debug!(row = row_num, source, "skipping row with empty password");
             warnings.push(ParseWarning {
                 source: source.to_string(),
@@ -118,6 +120,19 @@ mod tests {
         );
         let (entries, warnings) = parse_chromium(f.path(), "Chrome").unwrap();
         assert_eq!(entries.len(), 1);
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(warnings[0].row, 2);
+    }
+
+    #[test]
+    fn test_parse_chromium_keeps_password_whitespace() {
+        let f = write_csv(
+            "name,url,username,password\nSite,https://a.com,u, hunter2 \nBlank,https://b.com,u,   \n",
+        );
+        let (entries, warnings) = parse_chromium(f.path(), "Chrome").unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].password, " hunter2 ");
+        // A whitespace-only cell still counts as empty.
         assert_eq!(warnings.len(), 1);
         assert_eq!(warnings[0].row, 2);
     }
