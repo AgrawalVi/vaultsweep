@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-// WARNING: Do not derive Debug — password field must remain REDACTED.
+// WARNING: Do not derive Debug — password, notes and otp_auth must remain REDACTED.
 #[derive(Zeroize, ZeroizeOnDrop, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 /// A raw entry from a password CSV file.
@@ -29,10 +29,17 @@ impl fmt::Debug for RawEntry {
             .field("url", &self.url)
             .field("username", &self.username)
             .field("password", &"[REDACTED]")
-            .field("notes", &self.notes)
-            .field("otp_auth", &self.otp_auth)
+            .field("notes", &redacted_opt(&self.notes))
+            .field("otp_auth", &redacted_opt(&self.otp_auth))
             .finish()
     }
+}
+
+/// `Debug` stand-in for an optional secret: shows whether a value is present, never the value.
+///
+/// Used for `notes` (often security answers or recovery codes) and `otp_auth` (the TOTP seed).
+pub(crate) fn redacted_opt(value: &Option<String>) -> Option<&'static str> {
+    value.as_ref().map(|_| "[REDACTED]")
 }
 
 #[derive(Debug, thiserror::Error)]

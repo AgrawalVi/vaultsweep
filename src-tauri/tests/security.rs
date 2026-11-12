@@ -17,6 +17,10 @@ use vaultsweep_lib::parsers::RawEntry;
 
 /// Distinctive enough that a substring match cannot be a coincidence.
 const SENTINEL: &str = "ZZ-SENTINEL-9137";
+/// TOTP seed and notes are secrets too: one is a second factor, the other is where people
+/// keep security answers and recovery codes.
+const OTP_SENTINEL: &str = "ZZOTPSENTINEL4821";
+const NOTES_SENTINEL: &str = "ZZ-NOTES-SENTINEL-6604";
 
 // ------------------------------------------------------------- log capture
 
@@ -116,6 +120,53 @@ fn logs_never_contain_a_password() {
     );
 }
 
+#[test]
+fn logs_never_contain_an_otp_secret_or_notes() {
+    // iCloud is the only format that carries notes and OTP seeds.
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("icloud.csv");
+    std::fs::write(
+        &path,
+        format!(
+            "Title,URL,Username,Password,Notes,OTPAuth\n\
+             Sentinel Site,https://sentinel.example.com,user@example.com,{SENTINEL},\
+             {NOTES_SENTINEL},otpauth://totp/Sentinel?secret={OTP_SENTINEL}\n"
+        ),
+    )
+    .unwrap();
+
+    let captured = captured_log();
+    let before = captured.len();
+
+    let result = parse_csvs(vec![ImportTarget {
+        format: BrowserFormat::Icloud,
+        name: "iCloud".to_string(),
+        path: path.to_string_lossy().into_owned(),
+    }]);
+    assert_eq!(result.entries.len(), 1, "fixture should have parsed");
+    assert!(result.entries[0].otp_auth.is_some() && result.entries[0].notes.is_some());
+    let parse_rendered = format!("{result:?}");
+    let accounts = merge_entries(result.entries);
+    let merge_rendered = format!("{accounts:?}");
+
+    let logs = captured.contents();
+    assert!(
+        logs.len() > before,
+        "nothing was captured — the test proves nothing"
+    );
+    for secret in [SENTINEL, OTP_SENTINEL, NOTES_SENTINEL] {
+        assert!(!logs.contains(secret), "a secret reached the logs:\n{logs}");
+        assert!(
+            !parse_rendered.contains(secret),
+            "ParseResult Debug leaked: {parse_rendered}"
+        );
+        assert!(
+            !merge_rendered.contains(secret),
+            "MergedAccount Debug leaked: {merge_rendered}"
+        );
+    }
+}
+
 // ------------------------------------------------------------- Debug redaction
 
 fn sentinel_entry() -> RawEntry {
@@ -128,6 +179,14 @@ fn sentinel_entry() -> RawEntry {
         notes: None,
         otp_auth: None,
     }
+}
+
+/// `sentinel_entry` plus the two other secret fields, as an iCloud export would carry them.
+fn sentinel_entry_with_otp_and_notes() -> RawEntry {
+    let mut entry = sentinel_entry();
+    entry.notes = Some(NOTES_SENTINEL.to_string());
+    entry.otp_auth = Some(format!("otpauth://totp/Sentinel?secret={OTP_SENTINEL}"));
+    entry
 }
 
 /// Control for the redaction tests below. They all assert "the rendering does not contain
@@ -161,6 +220,26 @@ fn raw_entry_debug_redacts_the_password() {
 }
 
 #[test]
+fn raw_entry_debug_redacts_otp_and_notes() {
+    let rendered = format!("{:?}", sentinel_entry_with_otp_and_notes());
+    assert!(
+        !rendered.contains(OTP_SENTINEL),
+        "RawEntry Debug leaked: {rendered}"
+    );
+    assert!(
+        !rendered.contains(NOTES_SENTINEL),
+        "RawEntry Debug leaked: {rendered}"
+    );
+    // Presence is still visible, so the impl stays useful for debugging.
+    assert!(rendered.contains(r#"notes: Some("[REDACTED]")"#));
+    assert!(rendered.contains(r#"otp_auth: Some("[REDACTED]")"#));
+
+    let rendered = format!("{:?}", sentinel_entry());
+    assert!(rendered.contains("notes: None"));
+    assert!(rendered.contains("otp_auth: None"));
+}
+
+#[test]
 fn password_entry_debug_redacts_the_password() {
     let entry = PasswordEntry {
         password: SENTINEL.to_string(),
@@ -174,12 +253,31 @@ fn password_entry_debug_redacts_the_password() {
 
 #[test]
 fn merged_account_debug_redacts_transitively() {
-    // MergedAccount *derives* Debug — it is only safe because every PasswordEntry it
-    // holds redacts itself. This test is what keeps that true.
+    // MergedAccount's Debug prints its PasswordEntry values as-is — it is only safe
+    // because every PasswordEntry redacts itself. This test is what keeps that true.
     let accounts = merge_entries(vec![sentinel_entry()]);
     let rendered = format!("{accounts:?}");
     assert!(!rendered.contains(SENTINEL), "MergedAccount Debug leaked: {rendered}");
     assert!(rendered.contains("[REDACTED]"));
+}
+
+#[test]
+fn merged_account_debug_redacts_otp_and_notes() {
+    let accounts = merge_entries(vec![sentinel_entry_with_otp_and_notes()]);
+    assert!(
+        accounts[0].otp_auth.is_some() && accounts[0].notes.is_some(),
+        "the secrets never reached the merged account — the test proves nothing"
+    );
+    let rendered = format!("{accounts:?}");
+    assert!(
+        !rendered.contains(OTP_SENTINEL),
+        "MergedAccount Debug leaked: {rendered}"
+    );
+    assert!(
+        !rendered.contains(NOTES_SENTINEL),
+        "MergedAccount Debug leaked: {rendered}"
+    );
+    assert!(rendered.contains("sentinel.example.com"));
 }
 
 #[test]
