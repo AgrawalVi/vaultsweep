@@ -12,6 +12,8 @@ use zeroize::ZeroizeOnDrop;
 
 use vaultsweep_lib::commands::parser::{merge_entries, parse_csvs};
 use vaultsweep_lib::commands::{BrowserFormat, ImportTarget};
+use vaultsweep_lib::hibp::client::HibpRangeClient;
+use vaultsweep_lib::hibp::{check_password, split_sha1, HashSplit, HibpError, RangeSource};
 use vaultsweep_lib::merger::{MergedAccount, PasswordEntry};
 use vaultsweep_lib::parsers::RawEntry;
 
@@ -213,6 +215,7 @@ fn credential_structs_zeroize_on_drop() {
     assert_zeroize_on_drop::<RawEntry>();
     assert_zeroize_on_drop::<PasswordEntry>();
     assert_zeroize_on_drop::<MergedAccount>();
+    assert_zeroize_on_drop::<HashSplit>();
 }
 
 // ------------------------------------------------------------- read-only parsing
@@ -290,4 +293,84 @@ fn parse_errors_never_quote_a_password() {
         "error message leaked file contents: {}",
         result.errors[0].message
     );
+}
+
+// ------------------------------------------------------------- HIBP (invariant 4)
+
+/// A [`RangeSource`] that records every argument it is handed and answers with `body`.
+struct RecordingRange {
+    seen: Mutex<Vec<String>>,
+    body: String,
+}
+
+#[async_trait::async_trait]
+impl RangeSource for RecordingRange {
+    async fn fetch_range(&self, prefix: &str) -> Result<String, HibpError> {
+        self.seen.lock().unwrap().push(prefix.to_string());
+        Ok(self.body.clone())
+    }
+}
+
+#[tokio::test]
+async fn hibp_sends_only_a_five_hex_prefix() {
+    let split = split_sha1(SENTINEL);
+    // Answer with the sentinel's own suffix so the lookup runs to a match.
+    let src = RecordingRange {
+        seen: Mutex::new(Vec::new()),
+        body: format!("{}:3\r\n", split.suffix),
+    };
+
+    let result = check_password(&src, SENTINEL).await.unwrap();
+    assert!(
+        result.breached,
+        "fake range did not match — test proves nothing"
+    );
+
+    let seen = src.seen.lock().unwrap();
+    assert_eq!(seen.len(), 1);
+    let sent = &seen[0];
+    assert_eq!(sent.len(), 5, "sent more than the prefix: {sent}");
+    assert!(
+        sent.bytes().all(|b| b.is_ascii_hexdigit()),
+        "not hex: {sent}"
+    );
+    assert_eq!(sent, &split.prefix);
+    assert!(!sent.contains(SENTINEL));
+    assert!(!sent.contains(&split.suffix));
+}
+
+#[tokio::test]
+async fn hibp_refusal_never_logs_the_password_or_hash_suffix() {
+    let split = split_sha1(SENTINEL);
+    let full_hash = format!("{}{}", split.prefix, split.suffix);
+
+    let captured = captured_log();
+    let before = captured.len();
+
+    // A caller that widened the seam: the real client must refuse before the wire
+    // (no network is touched) and must not echo what it was handed.
+    let client = HibpRangeClient::new().unwrap();
+    let err = client.fetch_range(&full_hash).await.unwrap_err();
+
+    let logs = captured.contents();
+    assert!(
+        logs.len() > before,
+        "the refusal logged nothing — test proves nothing"
+    );
+    for leaked in [SENTINEL, split.suffix.as_str()] {
+        assert!(!logs.contains(leaked), "logs leaked {leaked}:\n{logs}");
+        assert!(!format!("{err} {err:?}").contains(leaked));
+    }
+}
+
+#[test]
+fn hash_split_debug_redacts_the_suffix() {
+    let split = split_sha1(SENTINEL);
+    let rendered = format!("{split:?}");
+    assert!(
+        !rendered.contains(&split.suffix),
+        "HashSplit Debug leaked the suffix: {rendered}"
+    );
+    assert!(rendered.contains(&split.prefix), "prefix is safe to show");
+    assert!(rendered.contains("[REDACTED]"));
 }
