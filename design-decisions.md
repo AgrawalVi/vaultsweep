@@ -167,3 +167,18 @@ With `Add-Padding: true` the response carries invented suffixes with a count of
 `0`, so a match is only a breach when the count is greater than zero. Also note
 `count` is an *occurrence count across the corpus*, not a number of breached
 sites — see C4 in the plan for why the user-facing copy must not conflate them.
+
+### ESLint runs typescript-eslint on TypeScript 6 while the project builds on TypeScript 7
+
+TypeScript 7 is the native Go port and ships no JS compiler API, and
+typescript-eslint 8 needs that API (peer `typescript <6.1`). `.pnpmfile.cjs`
+rewrites the typescript-eslint packages (and `ts-api-utils`) to depend on
+`npm:@typescript/typescript6` — Microsoft's TS 6 API package for exactly this
+case — instead of the project's TS 7 peer. `tsc`, `pnpm typecheck` and the build
+stay on TS 7. Only syntax-level rules are enabled (`strict`, not
+`strict-type-checked`), so a 6/7 type-system difference can't produce lint
+noise. Drop the hook once typescript-eslint supports TS 7.
+
+`pnpm lint` passes `--max-warnings 0`: `no-non-null-assertion` stays a warning
+so editors show it softly, but CI still blocks an unexplained `!` (escape with
+an `eslint-disable-next-line` comment saying why). Test files are exempt.

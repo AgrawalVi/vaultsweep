@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
@@ -102,10 +102,14 @@ export function ConnectSourcesScreen() {
 function UploadRow({ upload }: { upload: UploadedSource }) {
   const { renameUpload, removeUpload } = useWizardStore()
   const [localName, setLocalName] = useState(upload.name)
+  const [syncedName, setSyncedName] = useState(upload.name)
 
-  useEffect(() => {
+  // Pick up renames from the store. Adjusting state during render (rather
+  // than in an effect) avoids an extra render pass with the stale name.
+  if (upload.name !== syncedName) {
+    setSyncedName(upload.name)
     setLocalName(upload.name)
-  }, [upload.name])
+  }
 
   function commit() {
     const trimmed = localName.trim()

@@ -31,7 +31,8 @@ pnpm test                         # Vitest, single run (pnpm test:watch for watc
 cargo test --manifest-path src-tauri/Cargo.toml
 cargo test --manifest-path src-tauri/Cargo.toml -- --ignored   # known-bug markers + network tests (live HIBP)
 
-# pnpm lint is not wired up yet (no ESLint installed) — tracked in Linear VAU-27
+pnpm lint                         # ESLint (flat config in eslint.config.js)
+pnpm typecheck                    # tsc --noEmit
 cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 
 pnpm dlx shadcn@latest add <component>
