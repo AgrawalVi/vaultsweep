@@ -84,7 +84,8 @@ fn subdomain_is_boring(sub: &str) -> bool {
     if sub.is_empty() {
         return true;
     }
-    sub.split('.').all(|label| BORING_SUBDOMAIN_LABELS.contains(&label))
+    sub.split('.')
+        .all(|label| BORING_SUBDOMAIN_LABELS.contains(&label))
 }
 
 /// Extract the registrable domain from a URL string.

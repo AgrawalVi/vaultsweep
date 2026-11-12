@@ -94,10 +94,7 @@ mod tests {
             "",
         ] {
             assert!(
-                matches!(
-                    client.fetch_range(bad).await,
-                    Err(HibpError::BadResponse)
-                ),
+                matches!(client.fetch_range(bad).await, Err(HibpError::BadResponse)),
                 "expected {bad:?} to be refused before any request"
             );
         }
@@ -119,9 +116,8 @@ mod tests {
     #[tokio::test]
     #[ignore = "hits the network"]
     async fn test_live_range_lookup() {
-        let client = HibpRangeClient::new().expect(
-            "client build failed — reqwest resolved without a TLS backend, see Cargo.toml",
-        );
+        let client = HibpRangeClient::new()
+            .expect("client build failed — reqwest resolved without a TLS backend, see Cargo.toml");
         let result = crate::hibp::check_password(&client, "password")
             .await
             .expect("live range lookup failed");
@@ -132,6 +128,9 @@ mod tests {
             "implausibly low count ({}) — response parsing is probably wrong",
             result.count
         );
-        println!("live HIBP lookup ok: \"password\" seen {} times", result.count);
+        println!(
+            "live HIBP lookup ok: \"password\" seen {} times",
+            result.count
+        );
     }
 }
