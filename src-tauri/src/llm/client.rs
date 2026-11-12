@@ -237,6 +237,10 @@ fn chat_request(model: &str, input: &PromptInput) -> serde_json::Value {
     json!({
         "model": model,
         "stream": false,
+        // Thinking models reason in free text before the schema applies, and
+        // that text counts against `num_predict` — the JSON would be cut off.
+        // `false` is also what Ollama lists for models that cannot think.
+        "think": false,
         "format": response_schema(),
         "options": { "temperature": 0, "num_predict": MAX_REPLY_TOKENS },
         "keep_alive": KEEP_ALIVE,
@@ -656,6 +660,7 @@ mod tests {
             json!({
                 "model": "gemma4:e4b",
                 "stream": false,
+                "think": false,
                 "format": response_schema(),
                 "options": { "temperature": 0, "num_predict": 96 },
                 "keep_alive": "10m",

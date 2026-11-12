@@ -215,3 +215,13 @@ Tests run against a throwaway HTTP listener on a loopback port rather than a
 mocked trait, so the request body that would reach Ollama is asserted
 byte-for-byte. The one thing that cannot be covered that way is whether a real
 model honours the `format` schema — that is the `#[ignore]`d live test.
+
+### Thinking is switched off for classification
+
+Gemma 4 is a thinking model in Ollama. With thinking on, the model writes
+free-form reasoning first and the `format` schema only constrains what comes
+after, while `num_predict` counts both. At 96 tokens the JSON reply would be
+truncated. The chat request therefore sends `"think": false`. Ollama documents
+`false` as "no thinking, if the model permits it" and as the only value for
+models without thinking, so it is safe for a swapped-in model too. Whether a
+given model fully honours it is part of what the live test checks.
