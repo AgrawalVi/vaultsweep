@@ -35,6 +35,11 @@ pnpm lint                         # ESLint (flat config in eslint.config.js)
 pnpm typecheck                    # tsc --noEmit
 cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 
+# Security checks (CI `security` job)
+scripts/check-debug-derive.sh     # invariant 6: no derived Debug on password-holding types
+cargo deny --manifest-path src-tauri/Cargo.toml check   # advisories, licenses, sources (src-tauri/deny.toml)
+pnpm audit --prod --audit-level high
+
 pnpm dlx shadcn@latest add <component>
 
 # Required runtime deps (not yet wired into the app)
