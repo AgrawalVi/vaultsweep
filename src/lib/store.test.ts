@@ -422,4 +422,15 @@ describe('security invariants', () => {
     expect(get().step).toBe('triage-complete')
     expect(JSON.stringify(get())).not.toContain(SENTINEL_PASSWORD)
   })
+
+  it('keepAllReview advances and leaves every merge untouched', () => {
+    const accounts = [
+      makeSubdomainMerge({ normalizedDomain: 'interesting.com', subdomainIsInteresting: true }),
+      makeSubdomainMerge({ normalizedDomain: 'boring.com', subdomainIsInteresting: false }),
+    ]
+    useWizardStore.setState({ step: 'review-merges', mergedAccounts: accounts })
+    get().keepAllReview()
+    expect(get().step).toBe('triage-card')
+    expect(get().mergedAccounts).toEqual(accounts)
+  })
 })
