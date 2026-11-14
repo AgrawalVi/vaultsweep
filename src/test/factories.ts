@@ -9,6 +9,7 @@ export const SENTINEL_PASSWORD = 'ZZ-SENTINEL-9137'
 
 export function makePasswordEntry(o: Partial<PasswordEntry> = {}): PasswordEntry {
   return {
+    passwordId: 'pw:acct:example.com|user@example.com#0',
     password: SENTINEL_PASSWORD,
     source: 'Chrome',
     url: 'https://example.com',
@@ -30,9 +31,12 @@ export function makeRawEntry(o: Partial<RawEntry> = {}): RawEntry {
 }
 
 export function makeMergedAccount(o: Partial<MergedAccount> = {}): MergedAccount {
+  const normalizedDomain = o.normalizedDomain ?? 'example.com'
+  const username = o.username ?? 'user@example.com'
   return {
-    normalizedDomain: 'example.com',
-    username: 'user@example.com',
+    id: `acct:${normalizedDomain}|${username}`,
+    normalizedDomain,
+    username,
     sources: ['Chrome'],
     title: 'Example',
     notes: null,
@@ -52,8 +56,8 @@ export function makeConflictAccount(o: Partial<MergedAccount> = {}): MergedAccou
     hasConflict: true,
     sources: ['Chrome', 'Safari'],
     passwords: [
-      makePasswordEntry({ password: 'pw-chrome', source: 'Chrome', url: 'https://example.com' }),
-      makePasswordEntry({ password: 'pw-safari', source: 'Safari', url: 'https://app.example.com' }),
+      makePasswordEntry({ passwordId: 'pw:a#0', password: 'pw-chrome', source: 'Chrome', url: 'https://example.com' }),
+      makePasswordEntry({ passwordId: 'pw:a#1', password: 'pw-safari', source: 'Safari', url: 'https://app.example.com' }),
     ],
     allUrls: ['https://example.com', 'https://app.example.com'],
     ...o,
@@ -73,9 +77,11 @@ export function makeSubdomainMerge(o: Partial<MergedAccount> = {}): MergedAccoun
 export function makeReviewAccount(o: Partial<ReviewAccount> = {}): ReviewAccount {
   const domain = o.domain ?? 'example.com'
   const username = o.username ?? 'user@example.com'
+  const groupKey = o.groupKey ?? `acct:${domain}|${username}`
   return {
     id: 'row-1',
-    groupKey: `${domain}|${username}`,
+    groupKey,
+    accountId: groupKey,
     domain,
     username,
     title: 'Example',

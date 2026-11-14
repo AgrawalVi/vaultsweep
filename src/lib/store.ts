@@ -9,6 +9,7 @@ import {
   splitAll,
   splitSelected,
   suggestUploadName,
+  urlSubsetId,
 } from '@/lib/wizard-logic'
 import type { BrowserFormat, ImportTarget, MergedAccount, RawEntry, SourceError } from '@/types/parser'
 import type { ConflictResolution, ReviewAccount, UploadedSource } from '@/lib/wizard-logic'
@@ -36,11 +37,9 @@ const STEPS: WizardStep[] = [
   'triage-complete',
 ]
 
-interface TriageDecisions {
-  keep: number
-  delete: number
-  skip: number
-}
+export type TriageDecision = 'keep' | 'delete' | 'skip'
+
+type TriageDecisions = Record<TriageDecision, number>
 
 function newUploadId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
@@ -76,6 +75,8 @@ interface WizardStore {
   // Triage
   triageIndex: number
   triageDecisions: TriageDecisions
+  /** Latest decision per `MergedAccount.id`. Session Phase 2 builds its lists from this. */
+  triageDecisionById: Record<string, TriageDecision>
 
   advance: () => void
   back: () => void
@@ -97,7 +98,7 @@ interface WizardStore {
   commitReview: () => void
   skipReview: () => void
 
-  decideTriage: (d: 'keep' | 'delete' | 'skip') => void
+  decideTriage: (d: TriageDecision) => void
 }
 
 export const useWizardStore = create<WizardStore>((set, get) => ({
@@ -122,6 +123,7 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
 
   triageIndex: 0,
   triageDecisions: { keep: 0, delete: 0, skip: 0 },
+  triageDecisionById: {},
 
   advance: () => {
     const { step, history, mergedAccounts, rawMergedAccounts } = get()
@@ -166,6 +168,7 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
       reviewShowAll: false,
       triageIndex: 0,
       triageDecisions: { keep: 0, delete: 0, skip: 0 },
+  triageDecisionById: {},
     }),
 
   addUpload: async (category, path) => {
@@ -317,6 +320,7 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
         for (const url of a.allUrls) {
           next.push({
             ...a,
+            id: urlSubsetId(a.id, [url]),
             allUrls: [url],
             isSubdomainMerge: false,
             subdomainIsInteresting: false,
@@ -331,14 +335,15 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
   },
 
   decideTriage: (d) => {
-    const { triageIndex, triageDecisions, mergedAccounts, advance } = get()
+    const { triageIndex, triageDecisions, triageDecisionById, mergedAccounts, advance } = get()
+    const account = mergedAccounts[triageIndex]
+    if (!account) return
     const next = triageIndex + 1
-    const updated = { ...triageDecisions, [d]: triageDecisions[d] + 1 }
-    if (next >= mergedAccounts.length) {
-      set({ triageIndex: next, triageDecisions: updated })
-      advance()
-    } else {
-      set({ triageIndex: next, triageDecisions: updated })
-    }
+    set({
+      triageIndex: next,
+      triageDecisions: { ...triageDecisions, [d]: triageDecisions[d] + 1 },
+      triageDecisionById: { ...triageDecisionById, [account.id]: d },
+    })
+    if (next >= mergedAccounts.length) advance()
   },
 }))

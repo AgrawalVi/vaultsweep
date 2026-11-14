@@ -131,7 +131,7 @@ Skip semantics: auto-split *interesting* merges, keep boring ones collapsed. Def
 **Testing**:
 - Frontend: Vitest + Testing Library (jsdom). Tests are colocated in `src/` as `*.test.ts(x)` so `tsc` typechecks them. Config is standalone in `vitest.config.ts` (not `vite.config.ts`). Fixture builders live in `src/test/factories.ts`; `SENTINEL_PASSWORD` is the greppable password used by leak assertions.
 - Pure wizard logic lives in `src/lib/wizard-logic.ts` and is tested without a DOM or store; `store.test.ts` covers orchestration only and mocks `@/lib/tauri`.
-- Rust: inline `#[cfg(test)]` modules for parsers + merger (extend them when changing grouping logic); integration tests in `src-tauri/tests/` (`parse_pipeline.rs`, `security.rs`) driven by CSVs in `src-tauri/tests/fixtures/`. `merge()` output order is not deterministic — sort or look up by key, never index.
+- Rust: inline `#[cfg(test)]` modules for parsers + merger (extend them when changing grouping logic); integration tests in `src-tauri/tests/` (`parse_pipeline.rs`, `security.rs`) driven by CSVs in `src-tauri/tests/fixtures/`. `merge()` output is sorted by (domain, username), but prefer looking accounts up by `id` over indexing.
 - Known bugs are encoded, not skipped: `it.fails` in Vitest, `#[ignore = "bug: …"]` in Rust. When you fix one, the marker goes red — flip it to a normal test.
 - Playwright is not installed (Tauri e2e needs `tauri-driver`).
 
