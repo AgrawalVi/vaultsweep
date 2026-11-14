@@ -167,3 +167,15 @@ With `Add-Padding: true` the response carries invented suffixes with a count of
 `0`, so a match is only a breach when the count is greater than zero. Also note
 `count` is an *occurrence count across the corpus*, not a number of breached
 sites — see C4 in the plan for why the user-facing copy must not conflate them.
+
+## Stable account and password ids (VAU-15)
+
+### Identity is assigned by the merger, not by the frontend
+
+`MergedAccount.id = "acct:{normalized_domain}|{username}"` and `PasswordEntry.password_id = "pw:{account_id}#{i}"` are built in Rust from the grouping key, and `merge()` sorts its output by that key. The same CSVs therefore always produce the same ids in the same order, which the analysis queue, React keys, triage decisions and the Session Phase 2 deletion list all lean on. A password id is an opaque handle: it is never derived from the password, so it can cross the IPC boundary and land in logs or events once the frontend stops holding plaintext.
+
+### Fan-outs derive child ids; `analysisKey` is not identity
+
+"Keep separate" and Review Merges splits turn one merged account into several accounts that share a domain and username. Each gets `childId(parent, tag)` — `pw:{i}` for keep-separate, `urls:{sorted urls}` for review and skip splits — so ids stay unique and reproducible. The old `accountKey` (domain|username) is renamed `analysisKey`: it is the right cache key for LLM/usage analysis, which is per domain + username, but it collides after a fan-out, so nothing should use it to identify an account.
+
+In Review Merges the row that still holds the source account (the untouched original, the remainder after peeling URLs off, or a regroup that absorbs it) keeps the source id; every other row's id is derived from its URL set. Ids are deterministic for a given sequence of edits, not path-independent — splitting everything and regrouping back gives a child id, not the original one. Nothing downstream needs path-independence, only uniqueness and repeatability.

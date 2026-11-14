@@ -163,6 +163,7 @@ fn raw_entry_debug_redacts_the_password() {
 #[test]
 fn password_entry_debug_redacts_the_password() {
     let entry = PasswordEntry {
+        password_id: "pw:acct:sentinel.example.com|alice#0".to_string(),
         password: SENTINEL.to_string(),
         source: "Chrome".to_string(),
         url: Some("https://sentinel.example.com".to_string()),

@@ -29,9 +29,13 @@ export type ConflictResolution =
   | { kind: 'discard' }
 
 export interface ReviewAccount {
+  /** UI row id (React key, split/regroup target). Not account identity — see `accountId`. */
   id: string
-  /** `${domain}|${username}` — identifies rows that can be regrouped together. */
+  /** Id of the merged account this row came from. Rows sharing it can be regrouped. */
   groupKey: string
+  /** Identity of the account this row becomes on commit: the source account's id while
+   *  the row still holds that account, otherwise a `childId` derived from its URLs. */
+  accountId: string
   domain: string
   username: string
   title: string | null
@@ -58,16 +62,33 @@ export function recomputeRawEntries(uploads: UploadedSource[]): RawEntry[] {
   return uploads.flatMap(u => u.entries.map(e => ({ ...e, source: u.name })))
 }
 
-export function accountKey(a: Pick<MergedAccount, 'normalizedDomain' | 'username'>): string {
+/** Cache key for per-account analysis (LLM category, usage score). Right as an analysis
+ *  key — every account with the same domain + username shares one answer — but wrong as
+ *  identity: "keep separate" and review splits produce several accounts with the same
+ *  key. Use `MergedAccount.id` for identity. */
+export function analysisKey(a: Pick<MergedAccount, 'normalizedDomain' | 'username'>): string {
   return `${a.normalizedDomain}|${a.username}`
+}
+
+/** Id for an account derived from `base` by a fan-out. `tag` must be unique among the
+ *  children of one base; the `pw:` / `urls:` prefixes keep different fan-outs apart. */
+export function childId(base: string, tag: string): string {
+  return `${base}/${tag}`
+}
+
+/** Id for a review row (or auto-split account) holding a subset of its source account's
+ *  URLs. Order-insensitive, so the same URL set always gets the same id. */
+export function urlSubsetId(base: string, urls: string[]): string {
+  return childId(base, `urls:${[...urls].sort().join(' ')}`)
 }
 
 export function buildReviewAccounts(accounts: MergedAccount[]): ReviewAccount[] {
   return accounts
     .filter(a => a.isSubdomainMerge)
     .map((a, i) => ({
-      id: `orig-${i}-${accountKey(a)}`,
-      groupKey: accountKey(a),
+      id: `orig-${i}-${a.id}`,
+      groupKey: a.id,
+      accountId: a.id,
       domain: a.normalizedDomain,
       username: a.username,
       title: a.title,
@@ -83,6 +104,7 @@ export function buildReviewAccounts(accounts: MergedAccount[]): ReviewAccount[] 
 
 export function reviewToMergedAccount(r: ReviewAccount): MergedAccount {
   return {
+    id: r.accountId,
     normalizedDomain: r.domain,
     username: r.username,
     sources: r.sources,
@@ -115,10 +137,11 @@ export function applyConflictResolutions(
       const chosen = account.passwords[r.passwordIdx] ?? account.passwords[0]
       resolved.push({ ...account, passwords: [chosen], hasConflict: false })
     } else if (r.kind === 'separate') {
-      account.passwords.forEach(pw => {
+      account.passwords.forEach((pw, i) => {
         const url = pw.url ?? null
         resolved.push({
           ...account,
+          id: childId(account.id, `pw:${i}`),
           sources: [pw.source],
           passwords: [pw],
           allUrls: url ? [url] : account.allUrls,
@@ -144,6 +167,7 @@ export function splitAll(rows: ReviewAccount[], rowId: string): ReviewAccount[] 
     return r.urls.map((u, i) => ({
       ...r,
       id: `split-${rowId}-${i}-${u}`,
+      accountId: urlSubsetId(r.groupKey, [u]),
       urls: [u],
       origin: 'split' as const,
     }))
@@ -170,11 +194,15 @@ export function splitSelected(
       out.push(r)
       continue
     }
-    out.push({ ...r, urls: remaining })
+    // The remainder keeps the source account's id if it held it; a row that was already
+    // a subset gets re-derived so its id still matches its URLs.
+    const accountId = r.accountId === r.groupKey ? r.accountId : urlSubsetId(r.groupKey, remaining)
+    out.push({ ...r, accountId, urls: remaining })
     peeled.forEach((u, i) => {
       out.push({
         ...r,
         id: `split-${rowId}-${i}-${u}`,
+        accountId: urlSubsetId(r.groupKey, [u]),
         urls: [u],
         origin: 'split' as const,
       })
@@ -199,9 +227,12 @@ export function regroup(
   const base = targets[0]
   const mergedUrls: string[] = []
   for (const t of targets) for (const u of t.urls) if (!mergedUrls.includes(u)) mergedUrls.push(u)
+  // Regrouping onto the row that still holds the source account keeps its id.
+  const holder = targets.find(t => t.accountId === key)
   const combined: ReviewAccount = {
     ...base,
     id: `regroup-${idSeed}-${key}`,
+    accountId: holder ? holder.accountId : urlSubsetId(key, mergedUrls),
     urls: mergedUrls,
     origin: 'split',
   }

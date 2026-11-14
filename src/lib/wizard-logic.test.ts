@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   applyConflictResolutions,
   buildReviewAccounts,
+  childId,
   recomputeRawEntries,
   regroup,
   reviewToMergedAccount,
   splitAll,
   splitSelected,
   suggestUploadName,
+  urlSubsetId,
 } from '@/lib/wizard-logic'
 import {
   makeConflictAccount,
@@ -176,11 +178,12 @@ describe('buildReviewAccounts', () => {
     expect(rows.map(r => r.domain)).toEqual(['merged.com'])
   })
 
-  it('derives groupKey from domain and username', () => {
+  it('keys rows by the source account id', () => {
     const [row] = buildReviewAccounts([
       makeSubdomainMerge({ normalizedDomain: 'example.com', username: 'me@x.com' }),
     ])
-    expect(row.groupKey).toBe('example.com|me@x.com')
+    expect(row.groupKey).toBe('acct:example.com|me@x.com')
+    expect(row.accountId).toBe(row.groupKey)
     expect(row.origin).toBe('original')
   })
 
@@ -419,5 +422,72 @@ describe('regroup', () => {
     expect(out[0].title).toBe('First')
     expect(out[0].sources).toEqual(['Chrome'])
     expect(out[0].passwords).toHaveLength(1)
+  })
+})
+
+describe('account ids', () => {
+  const base = 'acct:example.com|user@example.com'
+  const threeUrls = ['https://a.example.com', 'https://b.example.com', 'https://c.example.com']
+  const ids = (rows: { accountId: string }[]) => rows.map(r => r.accountId)
+
+  it('urlSubsetId ignores url order', () => {
+    expect(urlSubsetId(base, ['https://b.x', 'https://a.x'])).toBe(
+      urlSubsetId(base, ['https://a.x', 'https://b.x']),
+    )
+  })
+
+  it('separate gives each candidate its own child id', () => {
+    const account = makeConflictAccount()
+    const { resolved } = applyConflictResolutions([account], { 0: { kind: 'separate' } })
+    expect(resolved.map(a => a.id)).toEqual([
+      childId(account.id, 'pw:0'),
+      childId(account.id, 'pw:1'),
+    ])
+  })
+
+  it('combine keeps the merged account id', () => {
+    const account = makeConflictAccount()
+    const { resolved } = applyConflictResolutions([account], {
+      0: { kind: 'combine', passwordIdx: 1 },
+    })
+    expect(resolved[0].id).toBe(account.id)
+  })
+
+  it('splitAll gives every url row a distinct id derived from its url', () => {
+    const out = splitAll([makeReviewAccount({ id: 'r1', urls: threeUrls })], 'r1')!
+    expect(ids(out)).toEqual(threeUrls.map(u => urlSubsetId(base, [u])))
+  })
+
+  it('splitSelected leaves the source id on the remainder', () => {
+    const out = splitSelected(
+      [makeReviewAccount({ id: 'r1', urls: threeUrls })],
+      'r1',
+      ['https://b.example.com'],
+    )!
+    expect(ids(out)).toEqual([base, urlSubsetId(base, ['https://b.example.com'])])
+  })
+
+  it('regrouping onto the row that holds the source id keeps it', () => {
+    const peeled = splitSelected(
+      [makeReviewAccount({ id: 'r1', urls: threeUrls })],
+      'r1',
+      ['https://b.example.com'],
+    )!
+    const out = regroup(peeled, peeled.map(r => r.id), 1)!
+    expect(ids(out)).toEqual([base])
+  })
+
+  it('regrouping split rows derives the id from the combined urls', () => {
+    const split = splitAll([makeReviewAccount({ id: 'r1', urls: threeUrls })], 'r1')!
+    const out = regroup(split, [split[0].id, split[2].id], 1)!
+    expect(ids(out)).toEqual([
+      urlSubsetId(base, ['https://a.example.com', 'https://c.example.com']),
+      urlSubsetId(base, ['https://b.example.com']),
+    ])
+  })
+
+  it('reviewToMergedAccount carries the row accountId', () => {
+    const row = makeReviewAccount({ accountId: 'acct:x|y/urls:z' })
+    expect(reviewToMergedAccount(row).id).toBe('acct:x|y/urls:z')
   })
 })

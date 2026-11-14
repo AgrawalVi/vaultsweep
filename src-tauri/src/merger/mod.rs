@@ -12,6 +12,8 @@ use boring_subdomains::BORING_SUBDOMAIN_LABELS;
 #[derive(Zeroize, ZeroizeOnDrop, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PasswordEntry {
+    /// Opaque handle, `pw:{account_id}#{i}`. Never derived from the password itself.
+    pub password_id: String,
     pub password: String,
     pub source: String,
     /// The original URL this password was saved under. Needed by the conflict-resolution UI
@@ -23,6 +25,7 @@ pub struct PasswordEntry {
 impl fmt::Debug for PasswordEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PasswordEntry")
+            .field("password_id", &self.password_id)
             .field("password", &"[REDACTED]")
             .field("source", &self.source)
             .field("url", &self.url)
@@ -34,6 +37,9 @@ impl fmt::Debug for PasswordEntry {
 #[derive(Debug, Zeroize, ZeroizeOnDrop, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct MergedAccount {
+    /// Stable identity, `acct:{normalized_domain}|{username}`. Unique within one
+    /// `merge()` result because it is built from the grouping key.
+    pub id: String,
     pub normalized_domain: String,
     pub username: String,
     pub sources: Vec<String>,
@@ -115,6 +121,7 @@ pub(crate) fn normalize_domain(url_str: Option<&str>) -> String {
 ///
 /// Grouping key: (normalized_domain, lowercased username).
 /// Entries sharing the same key but with different passwords produce `has_conflict = true`.
+/// Output is sorted by (normalized_domain, username) so ids and order are deterministic.
 pub fn merge(entries: Vec<RawEntry>) -> Vec<MergedAccount> {
     let mut buckets: HashMap<(String, String), Vec<RawEntry>> = HashMap::new();
 
@@ -130,9 +137,13 @@ pub fn merge(entries: Vec<RawEntry>) -> Vec<MergedAccount> {
         buckets.entry((domain, username)).or_default().push(entry);
     }
 
+    let mut buckets: Vec<_> = buckets.into_iter().collect();
+    buckets.sort_by(|(a, _), (b, _)| a.cmp(b));
+
     buckets
         .into_iter()
         .map(|((normalized_domain, username), entries)| {
+            let id = format!("acct:{normalized_domain}|{username}");
             let mut sources: Vec<String> = Vec::new();
             let mut passwords: Vec<PasswordEntry> = Vec::new();
             let mut title: Option<String> = None;
@@ -168,6 +179,7 @@ pub fn merge(entries: Vec<RawEntry>) -> Vec<MergedAccount> {
                 let already_seen = passwords.iter().any(|p| p.password == entry.password);
                 if !already_seen {
                     passwords.push(PasswordEntry {
+                        password_id: format!("pw:{id}#{}", passwords.len()),
                         password: entry.password.clone(),
                         source: entry.source.clone(),
                         url: entry.url.clone(),
@@ -181,6 +193,7 @@ pub fn merge(entries: Vec<RawEntry>) -> Vec<MergedAccount> {
                 is_subdomain_merge && subdomains.iter().any(|s| !subdomain_is_boring(s));
 
             MergedAccount {
+                id,
                 normalized_domain,
                 username,
                 sources,
@@ -393,6 +406,60 @@ mod tests {
             .all_urls
             .iter()
             .any(|u| u == "https://accounts.google.com"));
+    }
+
+    #[test]
+    fn output_sorted_by_domain_then_username() {
+        let entries = vec![
+            make_entry("https://zeta.com", "bob", "s", "icloud"),
+            make_entry("https://alpha.com", "carol", "s", "icloud"),
+            make_entry("https://zeta.com", "alice", "s", "icloud"),
+            make_entry("https://alpha.com", "bob", "s", "icloud"),
+        ];
+        let ids: Vec<String> = merge(entries).iter().map(|a| a.id.clone()).collect();
+        assert_eq!(
+            ids,
+            vec![
+                "acct:alpha.com|bob",
+                "acct:alpha.com|carol",
+                "acct:zeta.com|alice",
+                "acct:zeta.com|bob",
+            ]
+        );
+    }
+
+    #[test]
+    fn ids_stable_across_input_order() {
+        let a = make_entry("https://github.com", "alice", "s1", "icloud");
+        let b = make_entry("https://gitlab.com", "alice", "s2", "chrome");
+        let first: Vec<String> = merge(vec![a.clone(), b.clone()])
+            .iter()
+            .map(|m| m.id.clone())
+            .collect();
+        let second: Vec<String> = merge(vec![b, a]).iter().map(|m| m.id.clone()).collect();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn password_ids_index_candidates_and_never_contain_password() {
+        let entries = vec![
+            make_entry("https://github.com", "Alice", "old-pass", "icloud"),
+            make_entry("https://github.com", "alice", "new-pass", "chrome"),
+        ];
+        let result = merge(entries);
+        assert_eq!(result[0].id, "acct:github.com|alice");
+        let ids: Vec<&str> = result[0]
+            .passwords
+            .iter()
+            .map(|p| p.password_id.as_str())
+            .collect();
+        assert_eq!(
+            ids,
+            vec!["pw:acct:github.com|alice#0", "pw:acct:github.com|alice#1"]
+        );
+        for p in &result[0].passwords {
+            assert!(!p.password_id.contains(&p.password));
+        }
     }
 
     #[test]

@@ -331,6 +331,14 @@ describe('review merges', () => {
     expect(boring[0].isSubdomainMerge).toBe(true)
     expect(boring[0].allUrls).toHaveLength(2)
   })
+  it('skipReview gives each auto-split account its own id', () => {
+    const merged = makeSubdomainMerge()
+    useWizardStore.setState({ step: 'review-merges', mergedAccounts: [merged] })
+    get().skipReview()
+    const ids = get().mergedAccounts.map(a => a.id)
+    expect(new Set(ids).size).toBe(2)
+    expect(ids.every(id => id.startsWith(`${merged.id}/`))).toBe(true)
+  })
 })
 
 describe('triage', () => {
@@ -352,6 +360,21 @@ describe('triage', () => {
     expect(get().step).toBe('triage-complete')
     expect(get().triageDecisions).toEqual({ keep: 0, delete: 0, skip: 1 })
   })
+  it('records each decision against the account id', () => {
+    useWizardStore.setState({
+      step: 'triage-card',
+      mergedAccounts: [
+        makeMergedAccount({ normalizedDomain: 'a.com' }),
+        makeMergedAccount({ normalizedDomain: 'b.com' }),
+      ],
+    })
+    get().decideTriage('delete')
+    get().decideTriage('keep')
+    expect(get().triageDecisionById).toEqual({
+      'acct:a.com|user@example.com': 'delete',
+      'acct:b.com|user@example.com': 'keep',
+    })
+  })
 })
 
 describe('reset', () => {
@@ -368,6 +391,7 @@ describe('reset', () => {
       reviewUndoStack: [[makeReviewAccount()]],
       triageIndex: 5,
       triageDecisions: { keep: 1, delete: 2, skip: 3 },
+      triageDecisionById: { 'acct:x|y': 'keep' },
     })
     get().reset()
     expect(get().step).toBe('welcome')
@@ -381,6 +405,7 @@ describe('reset', () => {
     expect(get().reviewUndoStack).toEqual([])
     expect(get().triageIndex).toBe(0)
     expect(get().triageDecisions).toEqual({ keep: 0, delete: 0, skip: 0 })
+    expect(get().triageDecisionById).toEqual({})
   })
 })
 

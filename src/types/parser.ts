@@ -36,6 +36,8 @@ export interface ParseResult {
 }
 
 export interface PasswordEntry {
+  /** Opaque handle assigned by the merger, `pw:{accountId}#{i}`. Never contains the password. */
+  passwordId: string;
   password: string;
   source: string;
   /** Original URL this password was saved under, if any. Lets the conflict UI show
@@ -44,6 +46,9 @@ export interface PasswordEntry {
 }
 
 export interface MergedAccount {
+  /** Stable identity. The merger assigns `acct:{normalizedDomain}|{username}`; accounts
+   *  fanned out later (keep separate, review splits) get a `childId` of their parent. */
+  id: string;
   normalizedDomain: string;
   username: string;
   sources: string[];
