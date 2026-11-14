@@ -1,4 +1,9 @@
 use std::path::Path;
+use std::sync::Arc;
+
+use crate::analysis::AnalysisState;
+use crate::merger::MergedAccount;
+use crate::parsers::RawEntry;
 
 use crate::parsers::{chromium::parse_chromium, firefox::parse_firefox, icloud::parse_icloud};
 
@@ -52,8 +57,23 @@ pub fn parse_csvs(targets: Vec<ImportTarget>) -> ParseResult {
 }
 
 #[tauri::command]
-pub fn merge_entries(entries: Vec<crate::parsers::RawEntry>) -> Vec<crate::merger::MergedAccount> {
+pub fn merge_entries(
+    state: tauri::State<'_, Arc<AnalysisState>>,
+    entries: Vec<RawEntry>,
+) -> Vec<MergedAccount> {
+    merge_into(&state, entries)
+}
+
+/// The body of `merge_entries`, minus the Tauri wrapper so tests can call it directly.
+/// Merges, then loads every password into the backend vault under a new generation.
+pub fn merge_into(state: &AnalysisState, entries: Vec<RawEntry>) -> Vec<MergedAccount> {
     let result = crate::merger::merge(entries);
-    tracing::info!(account_count = result.len(), "merge_entries completed");
+    let generation = state.load_merge(&result);
+    tracing::info!(
+        account_count = result.len(),
+        vault_count = state.vault().len(),
+        generation,
+        "merge_entries completed"
+    );
     result
 }

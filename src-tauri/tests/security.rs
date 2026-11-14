@@ -10,7 +10,8 @@ use std::sync::{Arc, Mutex, OnceLock};
 use tempfile::TempDir;
 use zeroize::ZeroizeOnDrop;
 
-use vaultsweep_lib::commands::parser::{merge_entries, parse_csvs};
+use vaultsweep_lib::analysis::AnalysisState;
+use vaultsweep_lib::commands::parser::{merge_into, parse_csvs};
 use vaultsweep_lib::commands::{BrowserFormat, ImportTarget};
 use vaultsweep_lib::merger::{MergedAccount, PasswordEntry};
 use vaultsweep_lib::parsers::RawEntry;
@@ -102,7 +103,7 @@ fn logs_never_contain_a_password() {
 
     let result = parse_csvs(vec![sentinel_target(path)]);
     assert_eq!(result.entries.len(), 2, "fixture should have parsed");
-    let accounts = merge_entries(result.entries);
+    let accounts = merge_into(&AnalysisState::default(), result.entries);
     assert!(!accounts.is_empty());
 
     let logs = captured.contents();
@@ -177,10 +178,21 @@ fn password_entry_debug_redacts_the_password() {
 fn merged_account_debug_redacts_transitively() {
     // MergedAccount *derives* Debug — it is only safe because every PasswordEntry it
     // holds redacts itself. This test is what keeps that true.
-    let accounts = merge_entries(vec![sentinel_entry()]);
+    let accounts = merge_into(&AnalysisState::default(), vec![sentinel_entry()]);
     let rendered = format!("{accounts:?}");
     assert!(!rendered.contains(SENTINEL), "MergedAccount Debug leaked: {rendered}");
     assert!(rendered.contains("[REDACTED]"));
+}
+
+#[test]
+fn analysis_state_debug_redacts_the_vault() {
+    // merge_into copies every password into the vault; the managed state's Debug must
+    // not print them back out.
+    let state = AnalysisState::default();
+    let _accounts = merge_into(&state, vec![sentinel_entry()]);
+    assert_eq!(state.vault().len(), 1, "the vault should hold the sentinel");
+    let rendered = format!("{state:?}");
+    assert!(!rendered.contains(SENTINEL), "AnalysisState Debug leaked: {rendered}");
 }
 
 #[test]
@@ -230,7 +242,7 @@ fn parsing_never_writes_to_disk() {
 
     let before = snapshot(dir.path());
     let result = parse_csvs(vec![sentinel_target(path)]);
-    let _accounts = merge_entries(result.entries);
+    let _accounts = merge_into(&AnalysisState::default(), result.entries);
     let after = snapshot(dir.path());
 
     assert_eq!(before.len(), 1, "expected exactly the input CSV");

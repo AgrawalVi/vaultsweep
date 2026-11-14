@@ -179,3 +179,11 @@ sites — see C4 in the plan for why the user-facing copy must not conflate them
 "Keep separate" and Review Merges splits turn one merged account into several accounts that share a domain and username. Each gets `childId(parent, tag)` — `pw:{i}` for keep-separate, `urls:{sorted urls}` for review and skip splits — so ids stay unique and reproducible. The old `accountKey` (domain|username) is renamed `analysisKey`: it is the right cache key for LLM/usage analysis, which is per domain + username, but it collides after a fan-out, so nothing should use it to identify an account.
 
 In Review Merges the row that still holds the source account (the untouched original, the remainder after peeling URLs off, or a regroup that absorbs it) keeps the source id; every other row's id is derived from its URL set. Ids are deterministic for a given sequence of edits, not path-independent — splitting everything and regrouping back gives a child id, not the original one. Nothing downstream needs path-independence, only uniqueness and repeatability.
+
+## Backend password vault (VAU-16)
+
+`merge_entries` copies every candidate password into a `PasswordVault` on the Tauri-managed `Arc<AnalysisState>`, keyed by `passwordId`. Analysis work items and the events they produce carry only the id; the worker looks the password up in-process. That keeps passwords from crossing the IPC boundary a second time, and it is the store the frontend will switch to once it holds handles instead of plaintext (VAU-62). Values are `Zeroizing<String>`, so a new merge (which replaces the vault) or a drop wipes the old ones, and the vault's hand-written `Debug` prints only a count.
+
+Each merge also bumps a generation counter. Work queued against an older merge compares generations and drops its result instead of reporting stale data. The maps use `std::sync::Mutex` because every critical section is short and synchronous — never hold a guard across an `.await`. A poisoned lock is recovered with `into_inner()` rather than propagated, since nothing the vault does can leave it half-updated.
+
+The LLM/HIBP caches, results, progress and the client handles listed in the original plan are left to the orchestrator (VAU-17), which is their first consumer and depends on the LLM types from VAU-13/VAU-14.
