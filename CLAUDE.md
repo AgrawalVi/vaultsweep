@@ -77,6 +77,9 @@ src-tauri/src/
   merger/
     mod.rs                # merge() → Vec<MergedAccount>
     boring_subdomains.rs  # set of "boring" subdomain labels (www, mail, accounts, ...)
+  analysis/
+    mod.rs                # AnalysisState (Tauri-managed Arc): generation counter + vault
+    vault.rs              # PasswordVault: zeroized passwords keyed by passwordId
   lib.rs, main.rs
 ```
 
