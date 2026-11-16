@@ -88,7 +88,7 @@ The merger groups by `(registrable_domain, lowercased_username)` and emits one o
 
 1. **Clean merge** — same key, same password. Sources unioned silently. `isSubdomainMerge = false`, `hasConflict = false`.
 2. **Subdomain merge** — same key, same password, different subdomains. `isSubdomainMerge = true`, `allUrls` holds every distinct URL. If every subdomain label is in `BORING_SUBDOMAIN_LABELS` (www/mail/accounts/login/auth/m/app/…), `subdomainIsInteresting = false` and it's merged silently; otherwise it's surfaced in the Review Merges window. See `boring_subdomains.rs`.
-3. **Conflict** — same key, different passwords. `hasConflict = true`, `passwords` has one entry per distinct password (each carrying its own `url` + `source`). User resolves on `MergeConflictScreen`.
+3. **Conflict** — same key, different passwords. `hasConflict = true`, `passwords` has one entry per distinct password (each carrying every `urls` + `sources` it was saved under). User resolves on `MergeConflictScreen`.
 
 ### Wizard flow and skip rules
 

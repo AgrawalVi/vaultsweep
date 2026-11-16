@@ -69,14 +69,34 @@ describe('MergeConflictScreen', () => {
     expect(screen.getByText('app.example.com')).toBeInTheDocument()
   })
 
+  it('lists every source and subdomain a shared password was saved under', () => {
+    useWizardStore.setState({
+      step: 'merge-conflict',
+      rawMergedAccounts: [
+        makeConflictAccount({
+          normalizedDomain: 'x.com',
+          passwords: [
+            makePasswordEntry({ password: 'a', sources: ['Chrome', 'Safari'], urls: ['https://a.x.com', 'https://b.x.com'] }),
+            makePasswordEntry({ password: 'b', sources: ['Chrome'], urls: ['https://c.x.com'] }),
+          ],
+        }),
+      ],
+    })
+    render(<MergeConflictScreen />)
+    expect(screen.getByText('From Chrome and Safari')).toBeInTheDocument()
+    expect(screen.getByText('a.x.com')).toBeInTheDocument()
+    expect(screen.getByText('b.x.com')).toBeInTheDocument()
+    expect(screen.getByText('c.x.com')).toBeInTheDocument()
+  })
+
   it('falls back to the raw url when a candidate url will not parse', () => {
     useWizardStore.setState({
       step: 'merge-conflict',
       rawMergedAccounts: [
         makeConflictAccount({
           passwords: [
-            makePasswordEntry({ password: 'a', source: 'Chrome', url: 'not a url' }),
-            makePasswordEntry({ password: 'b', source: 'Safari', url: null }),
+            makePasswordEntry({ password: 'a', sources: ['Chrome'], urls: ['not a url'] }),
+            makePasswordEntry({ password: 'b', sources: ['Safari'], urls: [] }),
           ],
         }),
       ],

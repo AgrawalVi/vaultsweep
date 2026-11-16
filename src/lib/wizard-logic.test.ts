@@ -117,11 +117,29 @@ describe('applyConflictResolutions', () => {
     expect(resolved.every(a => !a.hasConflict && !a.isSubdomainMerge)).toBe(true)
   })
 
+  it('separate keeps every url and source a shared password was saved under', () => {
+    // a.x.com (Chrome) and b.x.com (Safari) share p1; c.x.com (Chrome) has p2.
+    const account = makeConflictAccount({
+      sources: ['Chrome', 'Safari'],
+      passwords: [
+        makePasswordEntry({ password: 'p1', sources: ['Chrome', 'Safari'], urls: ['https://a.x.com', 'https://b.x.com'] }),
+        makePasswordEntry({ password: 'p2', sources: ['Chrome'], urls: ['https://c.x.com'] }),
+      ],
+      allUrls: ['https://a.x.com', 'https://b.x.com', 'https://c.x.com'],
+    })
+    const { resolved } = applyConflictResolutions([account], { 0: { kind: 'separate' } })
+    expect(resolved.map(a => a.sources)).toEqual([['Chrome', 'Safari'], ['Chrome']])
+    expect(resolved.map(a => a.allUrls)).toEqual([
+      ['https://a.x.com', 'https://b.x.com'],
+      ['https://c.x.com'],
+    ])
+  })
+
   it('separate falls back to the account allUrls when a candidate has no url', () => {
     const account = makeConflictAccount({
       passwords: [
-        makePasswordEntry({ password: 'pw-a', source: 'Chrome', url: null }),
-        makePasswordEntry({ password: 'pw-b', source: 'Safari', url: null }),
+        makePasswordEntry({ password: 'pw-a', sources: ['Chrome'], urls: [] }),
+        makePasswordEntry({ password: 'pw-b', sources: ['Safari'], urls: [] }),
       ],
       allUrls: ['https://example.com', 'https://app.example.com'],
     })

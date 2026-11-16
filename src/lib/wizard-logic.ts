@@ -138,13 +138,12 @@ export function applyConflictResolutions(
       resolved.push({ ...account, passwords: [chosen], hasConflict: false })
     } else if (r.kind === 'separate') {
       account.passwords.forEach((pw, i) => {
-        const url = pw.url ?? null
         resolved.push({
           ...account,
           id: childId(account.id, `pw:${i}`),
-          sources: [pw.source],
+          sources: pw.sources,
           passwords: [pw],
-          allUrls: url ? [url] : account.allUrls,
+          allUrls: pw.urls.length > 0 ? pw.urls : account.allUrls,
           hasConflict: false,
           isSubdomainMerge: false,
           subdomainIsInteresting: false,

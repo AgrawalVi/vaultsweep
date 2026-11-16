@@ -185,3 +185,7 @@ In Review Merges the row that still holds the source account (the untouched orig
 Import Summary used to call `runMerge()` on every mount, so Back from the conflict screen (or any later step) re-ran the merger and reset every conflict answer and review edit. Screens now call `ensureMerged()`, which merges only when `rawEntries` is a different array from the one last merged. `rawEntries` is rebuilt on every upload add, rename or remove, so array identity is an exact "uploads changed" signal without hashing anything that holds passwords. A failed merge doesn't record its input, so the next visit retries.
 
 Back on the conflict screen steps to the previous conflict and shows the saved answer; only Back on the first conflict leaves the run.
+
+## A conflict candidate keeps every URL and source (VAU-104)
+
+Supersedes the "first URL per distinct password" choice above. `PasswordEntry` now holds `urls` and `sources` lists, appended every time the same password shows up again, instead of only the first `url` and `source`. With one of each, "Keep separate" silently dropped the other copies: p1 saved in Chrome under a.x.com and in Safari under b.x.com came out as a single Chrome / a.x.com account, so Session Phase 2 would never have deleted the Safari copy. The conflict card lists every source and subdomain for the candidate, and "Keep separate" carries both lists over.
