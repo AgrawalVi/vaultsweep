@@ -189,3 +189,9 @@ Back on the conflict screen steps to the previous conflict and shows the saved a
 ## A conflict candidate keeps every URL and source (VAU-104)
 
 Supersedes the "first URL per distinct password" choice above. `PasswordEntry` now holds `urls` and `sources` lists, appended every time the same password shows up again, instead of only the first `url` and `source`. With one of each, "Keep separate" silently dropped the other copies: p1 saved in Chrome under a.x.com and in Safari under b.x.com came out as a single Chrome / a.x.com account, so Session Phase 2 would never have deleted the Safari copy. The conflict card lists every source and subdomain for the candidate, and "Keep separate" carries both lists over.
+
+## Deleting individual conflict candidates (VAU-60)
+
+`combine` and `separate` take an optional `discardIdxs` instead of adding a fourth `partial` kind: marking candidates is orthogonal to what happens to the rest, and a separate kind would need its own combine-or-separate flag anyway. Each marked candidate lands in `discardedAccounts` as its own account (id `childId(parent, 'pw:{i}')`, its own sources and URLs), so the deletion review can name exactly which copy goes. When some candidates are discarded, the combined account drops their sources and URLs, since those copies are being deleted. With no marks, combine is unchanged.
+
+Marking every candidate commits as plain `discard`, and a single survivor becomes one account under the parent id whether the user picked combine or separate, so the edge cases collapse onto shapes that already exist.

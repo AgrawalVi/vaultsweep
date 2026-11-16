@@ -212,6 +212,81 @@ describe('MergeConflictScreen', () => {
     expect(get().mergeConflictIndex).toBe(1)
   })
 
+  it('marks one candidate for deletion and combines the rest', async () => {
+    const user = userEvent.setup()
+    seedOneConflict()
+    render(<MergeConflictScreen />)
+    const boxes = screen.getAllByRole('checkbox', { name: 'Delete this password' })
+    // Marking the picked candidate moves the pick to one that stays.
+    await user.click(boxes[0])
+    expect(screen.getByText('1 password marked for deletion.', { exact: false })).toBeInTheDocument()
+    const cards = screen.getAllByText(/^From /).map(el => el.closest('[data-marked]') as HTMLElement)
+    expect(cards.map(c => c.dataset.marked)).toEqual(['true', 'false'])
+    expect(cards.map(c => c.dataset.selected)).toEqual(['false', 'true'])
+
+    await user.click(screen.getByRole('button', { name: 'Combine' }))
+    expect(get().mergedAccounts[0].passwords.map(p => p.password)).toEqual(['pw-safari'])
+    expect(get().discardedAccounts.map(a => a.passwords.map(p => p.password))).toEqual([['pw-chrome']])
+  })
+
+  it('ticking the box does not also pick that candidate', async () => {
+    const user = userEvent.setup()
+    seedOneConflict()
+    render(<MergeConflictScreen />)
+    await user.click(screen.getAllByRole('checkbox', { name: 'Delete this password' })[1])
+    const cards = screen.getAllByText(/^From /).map(el => el.closest('[data-marked]') as HTMLElement)
+    expect(cards.map(c => c.dataset.selected)).toEqual(['true', 'false'])
+  })
+
+  it('treats marking every candidate as Discard all', async () => {
+    const user = userEvent.setup()
+    seedOneConflict()
+    render(<MergeConflictScreen />)
+    for (const box of screen.getAllByRole('checkbox', { name: 'Delete this password' })) await user.click(box)
+    await user.click(screen.getByRole('button', { name: 'Discard all' }))
+    expect(get().mergedAccounts).toEqual([])
+    expect(get().conflictResolutions).toEqual({ 0: { kind: 'discard' } })
+  })
+
+  it('toggles a mark from the keyboard without committing', async () => {
+    const user = userEvent.setup()
+    seedOneConflict()
+    render(<MergeConflictScreen />)
+    const box = screen.getAllByRole('checkbox', { name: 'Delete this password' })[1]
+    box.focus()
+    await user.keyboard(' ')
+    expect(box).toHaveAttribute('aria-checked', 'true')
+    await user.keyboard('{Enter}')
+    expect(get().mergedAccounts).toEqual([])
+  })
+
+  it('hides the per-password boxes under Discard all', () => {
+    seedOneConflict()
+    render(<MergeConflictScreen />)
+    fireEvent.keyDown(window, { key: '3' })
+    expect(screen.queryByRole('checkbox', { name: 'Delete this password' })).not.toBeInTheDocument()
+  })
+
+  it('restores the marks when the user comes Back to a conflict', async () => {
+    const user = userEvent.setup()
+    useWizardStore.setState({
+      step: 'merge-conflict',
+      rawMergedAccounts: [
+        makeConflictAccount({ normalizedDomain: 'first.com' }),
+        makeConflictAccount({ normalizedDomain: 'second.com' }),
+      ],
+    })
+    render(<MergeConflictScreen />)
+    fireEvent.keyDown(window, { key: '2' })
+    await user.click(screen.getAllByRole('checkbox', { name: 'Delete this password' })[0])
+    await user.click(screen.getByRole('button', { name: 'Keep separate' }))
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(screen.getByText('first.com')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Keep separate' })).toBeInTheDocument()
+    const boxes = screen.getAllByRole('checkbox', { name: 'Delete this password' })
+    expect(boxes.map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'false'])
+  })
+
   it('resets the action and chosen candidate when the next conflict appears', async () => {
     const user = userEvent.setup()
     useWizardStore.setState({
