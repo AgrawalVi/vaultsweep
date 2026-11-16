@@ -46,11 +46,18 @@ export function MergeConflictScreen() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!current) return
-      if ((e.target as HTMLElement)?.tagName === 'INPUT') return
+      // A focused control already handled this key (a candidate card selecting itself).
+      // Committing here too would use the previous selection, which hasn't re-rendered yet.
+      if (e.defaultPrevented) return
+      const target = e.target instanceof Element ? e.target : null
+      if (target?.tagName === 'INPUT') return
       if (e.key === '1') setAction('combine')
       else if (e.key === '2') setAction('separate')
       else if (e.key === '3') setAction('discard')
       else if (e.key === 'Enter') {
+        // Enter on a button or radio activates that control (Back, the commit button),
+        // not a commit of whatever is selected.
+        if (target?.closest('button, [role=button], [role=radio]')) return
         e.preventDefault()
         commit()
       }

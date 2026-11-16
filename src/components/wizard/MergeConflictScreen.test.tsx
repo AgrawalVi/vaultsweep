@@ -150,6 +150,48 @@ describe('MergeConflictScreen', () => {
     expect(get().mergedAccounts).toHaveLength(1)
   })
 
+  it('selects, not commits, when Enter is pressed on a candidate card', async () => {
+    const user = userEvent.setup()
+    seedOneConflict()
+    render(<MergeConflictScreen />)
+    const cards = screen.getAllByRole('button').filter(el => el.dataset.selected !== undefined)
+    cards[1].focus()
+    await user.keyboard('{Enter}')
+    expect(cards[1].dataset.selected).toBe('true')
+    expect(get().mergedAccounts).toEqual([])
+
+    // A second Enter away from the cards commits the candidate now selected.
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    await user.keyboard('{Enter}')
+    expect(get().mergedAccounts[0].passwords.map(p => p.password)).toEqual(['pw-safari'])
+  })
+
+  it('goes back, not commits, when Enter is pressed on the Back button', async () => {
+    const user = userEvent.setup()
+    seedOneConflict()
+    useWizardStore.setState({ history: ['import-summary'] })
+    render(<MergeConflictScreen />)
+    screen.getByRole('button', { name: 'Back' }).focus()
+    await user.keyboard('{Enter}')
+    expect(get().step).toBe('import-summary')
+    expect(get().mergedAccounts).toEqual([])
+  })
+
+  it('commits once when Enter is pressed on the commit button', async () => {
+    const user = userEvent.setup()
+    useWizardStore.setState({
+      step: 'merge-conflict',
+      rawMergedAccounts: [
+        makeConflictAccount({ normalizedDomain: 'first.com' }),
+        makeConflictAccount({ normalizedDomain: 'second.com' }),
+      ],
+    })
+    render(<MergeConflictScreen />)
+    screen.getByRole('button', { name: 'Combine' }).focus()
+    await user.keyboard('{Enter}')
+    expect(get().mergeConflictIndex).toBe(1)
+  })
+
   it('resets the action and chosen candidate when the next conflict appears', async () => {
     const user = userEvent.setup()
     useWizardStore.setState({
