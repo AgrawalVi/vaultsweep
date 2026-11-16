@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { EyeIcon, EyeOffIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
@@ -46,6 +47,8 @@ export function MergeConflictScreen() {
 
   const [action, setAction] = useState<Action>('combine')
   const [chosenPasswordIdx, setChosenPasswordIdx] = useState(0)
+  /** Candidates the user marked for deletion, ascending. */
+  const [discardIdxs, setDiscardIdxs] = useState<number[]>([])
   const [showPasswords, setShowPasswords] = useState(false)
 
   // Whenever the visible conflict changes, show the user's earlier answer for it (they
@@ -54,6 +57,7 @@ export function MergeConflictScreen() {
     const saved = current ? conflictResolutions[current.i] : undefined
     setAction(saved?.kind ?? 'combine')
     setChosenPasswordIdx(saved?.kind === 'combine' ? saved.passwordIdx : 0)
+    setDiscardIdxs(saved && saved.kind !== 'discard' ? (saved.discardIdxs ?? []) : [])
     // Only on conflict change: re-reading after every commit would be a no-op anyway.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.i])
@@ -72,7 +76,7 @@ export function MergeConflictScreen() {
       else if (e.key === 'Enter') {
         // Enter on a button or radio activates that control (Back, the commit button),
         // not a commit of whatever is selected.
-        if (target?.closest('button, [role=button], [role=radio]')) return
+        if (target?.closest('button, [role=button], [role=radio], [role=checkbox]')) return
         e.preventDefault()
         commit()
       }
@@ -80,16 +84,32 @@ export function MergeConflictScreen() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [action, chosenPasswordIdx, current?.i])
+  }, [action, chosenPasswordIdx, discardIdxs, current?.i])
 
   if (!current) return null
   const { a: account, i: idx } = current
+  // Marking every candidate leaves nothing to combine or keep: it's "Discard all".
+  const discardingAll = action === 'discard' || discardIdxs.length === account.passwords.length
+  const markedCount = action === 'discard' ? 0 : discardIdxs.length
+
+  function toggleDiscard(i: number) {
+    const next = discardIdxs.includes(i)
+      ? discardIdxs.filter(d => d !== i)
+      : [...discardIdxs, i].sort((a, b) => a - b)
+    setDiscardIdxs(next)
+    // The password being kept can't also be deleted: move the pick to one that stays.
+    if (next.includes(chosenPasswordIdx)) {
+      const firstKept = account.passwords.findIndex((_, j) => !next.includes(j))
+      if (firstKept >= 0) setChosenPasswordIdx(firstKept)
+    }
+  }
 
   function commit() {
+    const marks = discardIdxs.length > 0 ? { discardIdxs } : {}
     let resolution: ConflictResolution
-    if (action === 'combine') resolution = { kind: 'combine', passwordIdx: chosenPasswordIdx }
-    else if (action === 'separate') resolution = { kind: 'separate' }
-    else resolution = { kind: 'discard' }
+    if (discardingAll) resolution = { kind: 'discard' }
+    else if (action === 'combine') resolution = { kind: 'combine', passwordIdx: chosenPasswordIdx, ...marks }
+    else resolution = { kind: 'separate', ...marks }
     resolveConflict(idx, resolution)
   }
 
@@ -116,18 +136,31 @@ export function MergeConflictScreen() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {account.passwords.map((entry, i) => (
-          <CandidateCard
-            key={i}
-            entry={entry}
-            domain={account.normalizedDomain}
-            reveal={showPasswords}
-            selected={action === 'combine' && chosenPasswordIdx === i}
-            selectable={action === 'combine'}
-            onSelect={() => setChosenPasswordIdx(i)}
-          />
-        ))}
+        {account.passwords.map((entry, i) => {
+          const marked = action !== 'discard' && discardIdxs.includes(i)
+          return (
+            <CandidateCard
+              key={i}
+              entry={entry}
+              domain={account.normalizedDomain}
+              reveal={showPasswords}
+              selected={action === 'combine' && !marked && chosenPasswordIdx === i}
+              selectable={action === 'combine' && !marked}
+              onSelect={() => setChosenPasswordIdx(i)}
+              markable={action !== 'discard'}
+              marked={marked}
+              onToggleMarked={() => toggleDiscard(i)}
+            />
+          )
+        })}
       </div>
+
+      {markedCount > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {markedCount} password{markedCount === 1 ? '' : 's'} marked for deletion. You'll confirm
+          before anything is removed.
+        </p>
+      )}
 
       <Separator />
 
@@ -167,9 +200,7 @@ export function MergeConflictScreen() {
       <div className="flex gap-2 mt-auto pt-4">
         <Button variant="outline" onClick={back}>Back</Button>
         <Button onClick={commit} className="ml-auto">
-          {action === 'combine' && 'Combine'}
-          {action === 'separate' && 'Keep separate'}
-          {action === 'discard' && 'Discard all'}
+          {discardingAll ? 'Discard all' : action === 'combine' ? 'Combine' : 'Keep separate'}
         </Button>
       </div>
     </div>
@@ -183,6 +214,9 @@ function CandidateCard({
   selected,
   selectable,
   onSelect,
+  markable,
+  marked,
+  onToggleMarked,
 }: {
   entry: PasswordEntry
   domain: string
@@ -190,16 +224,22 @@ function CandidateCard({
   selected: boolean
   selectable: boolean
   onSelect: () => void
+  /** Show the "Delete this password" checkbox. */
+  markable: boolean
+  marked: boolean
+  onToggleMarked: () => void
 }) {
   return (
     <Card
-      className={selected ? 'ring-2 ring-foreground/40' : ''}
+      className={[selected ? 'ring-2 ring-foreground/40' : '', marked ? 'opacity-60' : ''].join(' ')}
       onClick={selectable ? onSelect : undefined}
       data-selected={selected}
+      data-marked={marked}
       role={selectable ? 'button' : undefined}
       tabIndex={selectable ? 0 : undefined}
       onKeyDown={e => {
-        if (!selectable) return
+        // Keys on the checkbox inside belong to the checkbox.
+        if (!selectable || e.target !== e.currentTarget) return
         if (e.key === ' ' || e.key === 'Enter') {
           e.preventDefault()
           onSelect()
@@ -224,6 +264,16 @@ function CandidateCard({
           </span>
           <span className="text-[11px] text-muted-foreground">{entry.password.length} characters</span>
         </div>
+        {markable && (
+          // Not a click on the card: ticking the box must not also pick this password.
+          <label
+            className="flex items-center gap-2 text-xs"
+            onClick={e => e.stopPropagation()}
+          >
+            <Checkbox checked={marked} onCheckedChange={onToggleMarked} aria-label="Delete this password" />
+            {marked ? 'Will be deleted' : 'Delete this password'}
+          </label>
+        )}
       </CardContent>
     </Card>
   )

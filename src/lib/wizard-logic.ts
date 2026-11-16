@@ -23,9 +23,12 @@ export const CATEGORY_DEFAULT_NAME: Record<BrowserFormat, string> = {
   firefox: 'Firefox',
 }
 
+/** How the user resolved one conflicted account. `discardIdxs` marks individual candidates
+ *  for deletion; the rest are combined or kept separate. Marking every candidate is the
+ *  same as `discard`, and a single survivor becomes one plain account either way. */
 export type ConflictResolution =
-  | { kind: 'combine'; passwordIdx: number }
-  | { kind: 'separate' }
+  | { kind: 'combine'; passwordIdx: number; discardIdxs?: number[] }
+  | { kind: 'separate'; discardIdxs?: number[] }
   | { kind: 'discard' }
 
 export interface ReviewAccount {
@@ -119,8 +122,26 @@ export function reviewToMergedAccount(r: ReviewAccount): MergedAccount {
   }
 }
 
+/** One conflict candidate as an account of its own: its password, sources and URLs. */
+function candidateAccount(account: MergedAccount, pw: PasswordEntry, i: number): MergedAccount {
+  return {
+    ...account,
+    id: childId(account.id, `pw:${i}`),
+    sources: pw.sources,
+    passwords: [pw],
+    allUrls: pw.urls.length > 0 ? pw.urls : account.allUrls,
+    hasConflict: false,
+    isSubdomainMerge: false,
+    subdomainIsInteresting: false,
+  }
+}
+
+const union = (lists: string[][]): string[] => [...new Set(lists.flat())]
+
 /** Apply user's conflict resolutions to produce a flat, conflict-free list plus the
- *  list of accounts the user chose to discard (deferred to Phase 2 deletion review). */
+ *  list of accounts the user chose to discard (deferred to Phase 2 deletion review).
+ *  A candidate discarded on its own lands in `discarded` as its own account, so the
+ *  deletion review knows exactly which copies to remove. */
 export function applyConflictResolutions(
   accounts: MergedAccount[],
   resolutions: Record<number, ConflictResolution>,
@@ -133,25 +154,41 @@ export function applyConflictResolutions(
       return
     }
     const r = resolutions[idx] ?? { kind: 'combine' as const, passwordIdx: 0 }
-    if (r.kind === 'combine') {
-      const chosen = account.passwords[r.passwordIdx] ?? account.passwords[0]
-      resolved.push({ ...account, passwords: [chosen], hasConflict: false })
-    } else if (r.kind === 'separate') {
-      account.passwords.forEach((pw, i) => {
-        resolved.push({
-          ...account,
-          id: childId(account.id, `pw:${i}`),
-          sources: pw.sources,
-          passwords: [pw],
-          allUrls: pw.urls.length > 0 ? pw.urls : account.allUrls,
-          hasConflict: false,
-          isSubdomainMerge: false,
-          subdomainIsInteresting: false,
-        })
-      })
-    } else {
+    if (r.kind === 'discard') {
       discarded.push(account)
+      return
     }
+
+    const marked = new Set(r.discardIdxs ?? [])
+    const candidates = account.passwords.map((pw, i) => ({ pw, i }))
+    const kept = candidates.filter(c => !marked.has(c.i))
+    if (kept.length === 0) {
+      discarded.push(account)
+      return
+    }
+    for (const c of candidates) if (marked.has(c.i)) discarded.push(candidateAccount(account, c.pw, c.i))
+
+    if (r.kind === 'separate' && kept.length > 1) {
+      for (const c of kept) resolved.push(candidateAccount(account, c.pw, c.i))
+      return
+    }
+
+    // Combine, or "separate" with a single survivor: one account under the original id.
+    const wanted = r.kind === 'combine' ? r.passwordIdx : -1
+    const chosen = kept.find(c => c.i === wanted) ?? kept[0]
+    if (marked.size === 0) {
+      resolved.push({ ...account, passwords: [chosen.pw], hasConflict: false })
+      return
+    }
+    // Drop the discarded candidates' sources and URLs: those copies are being deleted.
+    const urls = union(kept.map(c => c.pw.urls))
+    resolved.push({
+      ...account,
+      sources: union(kept.map(c => c.pw.sources)),
+      allUrls: urls.length > 0 ? urls : account.allUrls,
+      passwords: [chosen.pw],
+      hasConflict: false,
+    })
   })
   return { resolved, discarded }
 }

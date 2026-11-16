@@ -149,6 +149,76 @@ describe('applyConflictResolutions', () => {
     expect(resolved[1].allUrls).toEqual(['https://example.com', 'https://app.example.com'])
   })
 
+  describe('discarding individual candidates', () => {
+    const three = () =>
+      makeConflictAccount({
+        sources: ['Chrome', 'Safari', 'Firefox'],
+        passwords: [
+          makePasswordEntry({ passwordId: 'pw:a#0', password: 'p0', sources: ['Chrome'], urls: ['https://a.example.com'] }),
+          makePasswordEntry({ passwordId: 'pw:a#1', password: 'p1', sources: ['Safari'], urls: ['https://b.example.com'] }),
+          makePasswordEntry({ passwordId: 'pw:a#2', password: 'p2', sources: ['Firefox'], urls: ['https://c.example.com'] }),
+        ],
+        allUrls: ['https://a.example.com', 'https://b.example.com', 'https://c.example.com'],
+      })
+
+    it('combine keeps the chosen password and sends each marked one to discarded', () => {
+      const { resolved, discarded } = applyConflictResolutions([three()], {
+        0: { kind: 'combine', passwordIdx: 2, discardIdxs: [0] },
+      })
+      expect(resolved).toHaveLength(1)
+      expect(resolved[0].id).toBe('acct:example.com|user@example.com')
+      expect(resolved[0].passwords.map(p => p.password)).toEqual(['p2'])
+      // The deleted copy's source and URL no longer belong to the kept account.
+      expect(resolved[0].sources).toEqual(['Safari', 'Firefox'])
+      expect(resolved[0].allUrls).toEqual(['https://b.example.com', 'https://c.example.com'])
+      expect(discarded.map(a => a.passwords.map(p => p.password))).toEqual([['p0']])
+      expect(discarded[0].sources).toEqual(['Chrome'])
+      expect(discarded[0].allUrls).toEqual(['https://a.example.com'])
+      expect(discarded[0].id).toBe('acct:example.com|user@example.com/pw:0')
+    })
+
+    it('separate keeps each unmarked candidate as its own account', () => {
+      const { resolved, discarded } = applyConflictResolutions([three()], {
+        0: { kind: 'separate', discardIdxs: [1] },
+      })
+      expect(resolved.map(a => a.passwords[0].password)).toEqual(['p0', 'p2'])
+      expect(resolved.map(a => a.id)).toEqual([
+        'acct:example.com|user@example.com/pw:0',
+        'acct:example.com|user@example.com/pw:2',
+      ])
+      expect(discarded.map(a => a.passwords[0].password)).toEqual(['p1'])
+    })
+
+    it('a single survivor becomes one plain account, whichever action was picked', () => {
+      for (const r of [
+        { kind: 'separate' as const, discardIdxs: [0, 2] },
+        { kind: 'combine' as const, passwordIdx: 1, discardIdxs: [0, 2] },
+      ]) {
+        const { resolved, discarded } = applyConflictResolutions([three()], { 0: r })
+        expect(resolved).toHaveLength(1)
+        expect(resolved[0].id).toBe('acct:example.com|user@example.com')
+        expect(resolved[0].passwords.map(p => p.password)).toEqual(['p1'])
+        expect(resolved[0].hasConflict).toBe(false)
+        expect(discarded.map(a => a.passwords[0].password)).toEqual(['p0', 'p2'])
+      }
+    })
+
+    it('marking every candidate is the same as discard all', () => {
+      const { resolved, discarded } = applyConflictResolutions([three()], {
+        0: { kind: 'separate', discardIdxs: [0, 1, 2] },
+      })
+      expect(resolved).toEqual([])
+      expect(discarded).toEqual(applyConflictResolutions([three()], { 0: { kind: 'discard' } }).discarded)
+    })
+
+    it('combine falls back to the first kept candidate if the chosen one is marked', () => {
+      const { resolved } = applyConflictResolutions([three()], {
+        0: { kind: 'combine', passwordIdx: 0, discardIdxs: [0] },
+      })
+      expect(resolved[0].passwords.map(p => p.password)).toEqual(['p1'])
+    })
+  })
+
   it('discard routes the account to discarded and never to resolved', () => {
     const { resolved, discarded } = applyConflictResolutions(
       [makeConflictAccount()],

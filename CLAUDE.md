@@ -100,10 +100,11 @@ Raw merger output lives in `rawMergedAccounts` (frozen after merge). Screens cal
 
 ### Conflict resolution shape
 
-`ConflictResolution` is a tagged union: `{kind:'combine', passwordIdx} | {kind:'separate'} | {kind:'discard'}`. Applied by `applyConflictResolutions` in `src/lib/store.ts`:
+`ConflictResolution` is a tagged union: `{kind:'combine', passwordIdx, discardIdxs?} | {kind:'separate', discardIdxs?} | {kind:'discard'}`. Applied by `applyConflictResolutions` in `src/lib/wizard-logic.ts`:
 - **combine** → one account with the chosen password, `hasConflict: false`.
-- **separate** → one account per candidate; each keeps its own subdomain URL.
+- **separate** → one account per candidate; each keeps its own subdomain URLs and sources.
 - **discard** → stashed in `discardedAccounts` for Session Phase 2's deletion review.
+- **discardIdxs** → candidates the user marked for deletion one by one; each goes to `discardedAccounts` as its own account and the rest are combined or kept separate. All marked = discard; one left = one plain account.
 
 ### Review Merges shape
 
