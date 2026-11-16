@@ -26,7 +26,7 @@ function subdomainLabel(url: string | null, domain: string): string {
 }
 
 export function MergeConflictScreen() {
-  const { rawMergedAccounts, mergeConflictIndex, resolveConflict, back } = useWizardStore()
+  const { rawMergedAccounts, mergeConflictIndex, conflictResolutions, resolveConflict, back } = useWizardStore()
   const conflicts = useMemo(
     () => rawMergedAccounts.map((a, i) => ({ a, i })).filter(({ a }) => a.hasConflict),
     [rawMergedAccounts],
@@ -37,10 +37,14 @@ export function MergeConflictScreen() {
   const [chosenPasswordIdx, setChosenPasswordIdx] = useState(0)
   const [showPasswords, setShowPasswords] = useState(false)
 
-  // Reset per-conflict local state whenever the visible conflict changes.
+  // Whenever the visible conflict changes, show the user's earlier answer for it (they
+  // came Back to it) or the default.
   useEffect(() => {
-    setAction('combine')
-    setChosenPasswordIdx(0)
+    const saved = current ? conflictResolutions[current.i] : undefined
+    setAction(saved?.kind ?? 'combine')
+    setChosenPasswordIdx(saved?.kind === 'combine' ? saved.passwordIdx : 0)
+    // Only on conflict change: re-reading after every commit would be a no-op anyway.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.i])
 
   useEffect(() => {

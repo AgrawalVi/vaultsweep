@@ -4,11 +4,13 @@ import { Card, CardContent } from '@/components/ui/card'
 import { useWizardStore } from '@/lib/store'
 
 export function ImportSummaryScreen() {
-  const { rawEntries, rawMergedAccounts, mergePending, mergeError, runMerge, advance, back } = useWizardStore()
+  const { rawEntries, rawMergedAccounts, mergePending, mergeError, runMerge, ensureMerged, advance, back } =
+    useWizardStore()
   const mergedAccounts = rawMergedAccounts
 
+  // Coming Back from later steps must not re-merge: that would wipe every conflict answer.
   useEffect(() => {
-    runMerge()
+    ensureMerged()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
