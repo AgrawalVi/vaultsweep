@@ -15,14 +15,25 @@ function maskedDots(password: string): string {
   return '•'.repeat(Math.max(len, 1))
 }
 
-function subdomainLabel(url: string | null, domain: string): string {
-  if (!url) return domain
+function subdomainLabel(url: string, domain: string): string {
   try {
     const host = new URL(url).hostname.toLowerCase()
     return host === domain ? domain : host
   } catch {
     return url
   }
+}
+
+/** Distinct "saved under" labels for a candidate; the bare domain when it had no URL. */
+function savedUnderLabels(urls: string[], domain: string): string[] {
+  if (urls.length === 0) return [domain]
+  return [...new Set(urls.map(u => subdomainLabel(u, domain)))]
+}
+
+/** "Chrome", "Chrome and Safari", "Chrome, Safari and Firefox". */
+function listSources(sources: string[]): string {
+  if (sources.length <= 1) return sources.join('')
+  return `${sources.slice(0, -1).join(', ')} and ${sources[sources.length - 1]}`
 }
 
 export function MergeConflictScreen() {
@@ -197,12 +208,14 @@ function CandidateCard({
       style={selectable ? { cursor: 'pointer' } : undefined}
     >
       <CardHeader>
-        <CardTitle className="text-sm">From {entry.source}</CardTitle>
+        <CardTitle className="text-sm">From {listSources(entry.sources)}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         <div className="flex flex-col">
           <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Saved under</span>
-          <span className="text-xs break-all">{subdomainLabel(entry.url, domain)}</span>
+          {savedUnderLabels(entry.urls, domain).map(label => (
+            <span key={label} className="text-xs break-all">{label}</span>
+          ))}
         </div>
         <div className="flex flex-col">
           <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Password</span>

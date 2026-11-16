@@ -397,7 +397,7 @@ function ConflictsView({ conflicts, total }: { conflicts: MergedAccount[]; total
                 <div className="flex flex-col gap-1">
                   {a.passwords.map((p, j) => (
                     <div key={j} className="flex items-center gap-2 text-xs">
-                      <Badge variant="outline">{p.source}</Badge>
+                      <Badge variant="outline">{p.sources.join(', ')}</Badge>
                       <code className="font-mono text-muted-foreground">••••••••</code>
                       <span className="text-muted-foreground">(len {p.password.length})</span>
                     </div>

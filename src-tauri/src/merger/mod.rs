@@ -15,11 +15,13 @@ pub struct PasswordEntry {
     /// Opaque handle, `pw:{account_id}#{i}`. Never derived from the password itself.
     pub password_id: String,
     pub password: String,
-    pub source: String,
-    /// The original URL this password was saved under. Needed by the conflict-resolution UI
-    /// so users can see which subdomain each candidate came from and preserve it when
-    /// choosing to keep the candidates as separate accounts.
-    pub url: Option<String>,
+    /// Every source this password was found in (distinct, first-seen order). The same
+    /// password can come from several browsers; each copy is one Session Phase 2 deletes.
+    pub sources: Vec<String>,
+    /// Every original URL this password was saved under (distinct, first-seen order). The
+    /// conflict UI shows them per candidate, and "keep separate" carries them over, so no
+    /// subdomain is lost when one password was saved under several.
+    pub urls: Vec<String>,
 }
 
 impl fmt::Debug for PasswordEntry {
@@ -27,8 +29,8 @@ impl fmt::Debug for PasswordEntry {
         f.debug_struct("PasswordEntry")
             .field("password_id", &self.password_id)
             .field("password", &"[REDACTED]")
-            .field("source", &self.source)
-            .field("url", &self.url)
+            .field("sources", &self.sources)
+            .field("urls", &self.urls)
             .finish()
     }
 }
@@ -176,14 +178,23 @@ pub fn merge(entries: Vec<RawEntry>) -> Vec<MergedAccount> {
                     }
                 }
 
-                let already_seen = passwords.iter().any(|p| p.password == entry.password);
-                if !already_seen {
-                    passwords.push(PasswordEntry {
+                match passwords.iter_mut().find(|p| p.password == entry.password) {
+                    Some(existing) => {
+                        if !existing.sources.contains(&entry.source) {
+                            existing.sources.push(entry.source.clone());
+                        }
+                        if let Some(url) = entry.url.as_deref() {
+                            if !existing.urls.iter().any(|u| u == url) {
+                                existing.urls.push(url.to_string());
+                            }
+                        }
+                    }
+                    None => passwords.push(PasswordEntry {
                         password_id: format!("pw:{id}#{}", passwords.len()),
                         password: entry.password.clone(),
-                        source: entry.source.clone(),
-                        url: entry.url.clone(),
-                    });
+                        sources: vec![entry.source.clone()],
+                        urls: entry.url.iter().cloned().collect(),
+                    }),
                 }
             }
 
@@ -387,6 +398,33 @@ mod tests {
         let result = merge(entries);
         assert!(result[0].has_conflict);
         assert!(!result[0].is_subdomain_merge);
+    }
+
+    #[test]
+    fn conflict_candidate_keeps_every_url_and_source_it_was_saved_under() {
+        // p1 is saved under two subdomains in two browsers; p2 once. Separating them later
+        // must not lose b.x.com or Safari, or Session Phase 2 never deletes that copy.
+        let entries = vec![
+            make_entry("https://a.x.com", "alice", "p1", "Chrome"),
+            make_entry("https://b.x.com", "alice", "p1", "Safari"),
+            make_entry("https://c.x.com", "alice", "p2", "Chrome"),
+            make_entry("https://a.x.com", "alice", "p1", "Chrome"),
+        ];
+        let result = merge(entries);
+        assert_eq!(result.len(), 1);
+        let pws = &result[0].passwords;
+        assert_eq!(pws.len(), 2);
+        assert_eq!(pws[0].sources, ["Chrome", "Safari"]);
+        assert_eq!(pws[0].urls, ["https://a.x.com", "https://b.x.com"]);
+        assert_eq!(pws[1].sources, ["Chrome"]);
+        assert_eq!(pws[1].urls, ["https://c.x.com"]);
+    }
+
+    #[test]
+    fn candidate_without_url_has_no_urls() {
+        let result = merge(vec![make_entry("", "alice", "p1", "Chrome")]);
+        assert!(result[0].passwords[0].urls.is_empty());
+        assert_eq!(result[0].passwords[0].sources, ["Chrome"]);
     }
 
     #[test]

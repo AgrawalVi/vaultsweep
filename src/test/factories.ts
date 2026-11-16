@@ -11,8 +11,8 @@ export function makePasswordEntry(o: Partial<PasswordEntry> = {}): PasswordEntry
   return {
     passwordId: 'pw:acct:example.com|user@example.com#0',
     password: SENTINEL_PASSWORD,
-    source: 'Chrome',
-    url: 'https://example.com',
+    sources: ['Chrome'],
+    urls: ['https://example.com'],
     ...o,
   }
 }
@@ -56,8 +56,8 @@ export function makeConflictAccount(o: Partial<MergedAccount> = {}): MergedAccou
     hasConflict: true,
     sources: ['Chrome', 'Safari'],
     passwords: [
-      makePasswordEntry({ passwordId: 'pw:a#0', password: 'pw-chrome', source: 'Chrome', url: 'https://example.com' }),
-      makePasswordEntry({ passwordId: 'pw:a#1', password: 'pw-safari', source: 'Safari', url: 'https://app.example.com' }),
+      makePasswordEntry({ passwordId: 'pw:a#0', password: 'pw-chrome', sources: ['Chrome'], urls: ['https://example.com'] }),
+      makePasswordEntry({ passwordId: 'pw:a#1', password: 'pw-safari', sources: ['Safari'], urls: ['https://app.example.com'] }),
     ],
     allUrls: ['https://example.com', 'https://app.example.com'],
     ...o,

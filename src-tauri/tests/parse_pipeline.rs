@@ -279,7 +279,11 @@ fn differing_passwords_under_one_key_surface_as_a_conflict() {
     assert_eq!(pws, ["correct-horse", "hunter2"]);
 
     // Each candidate keeps the URL it was saved under, so the conflict UI can label them.
-    let urls: Vec<_> = account.passwords.iter().filter_map(|p| p.url.as_deref()).collect();
+    let urls: Vec<_> = account
+        .passwords
+        .iter()
+        .flat_map(|p| p.urls.iter().map(String::as_str))
+        .collect();
     assert_eq!(urls.len(), 2);
     assert!(urls.contains(&"https://bank.example.com"));
 }

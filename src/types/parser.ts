@@ -39,10 +39,12 @@ export interface PasswordEntry {
   /** Opaque handle assigned by the merger, `pw:{accountId}#{i}`. Never contains the password. */
   passwordId: string;
   password: string;
-  source: string;
-  /** Original URL this password was saved under, if any. Lets the conflict UI show
-   *  per-candidate subdomain info and preserve it on "Keep separate". */
-  url: string | null;
+  /** Every source this password was found in (distinct, first-seen order). */
+  sources: string[];
+  /** Every original URL this password was saved under (distinct, first-seen order; empty
+   *  when none had a URL). The conflict UI shows them per candidate and "Keep separate"
+   *  carries them over, so no copy is lost when one password was saved in several places. */
+  urls: string[];
 }
 
 export interface MergedAccount {
