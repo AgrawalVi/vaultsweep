@@ -211,6 +211,28 @@ describe('MergeConflictScreen', () => {
     expect(screen.getByRole('button', { name: 'Combine' })).toBeInTheDocument()
   })
 
+  it('shows the earlier answer when the user comes Back to a conflict', async () => {
+    const user = userEvent.setup()
+    useWizardStore.setState({
+      step: 'merge-conflict',
+      history: ['import-summary'],
+      rawMergedAccounts: [
+        makeConflictAccount({ normalizedDomain: 'first.com' }),
+        makeConflictAccount({ normalizedDomain: 'second.com' }),
+      ],
+    })
+    render(<MergeConflictScreen />)
+    await user.click(screen.getByText('From Safari'))
+    await user.click(screen.getByRole('button', { name: 'Combine' }))
+    expect(screen.getByText('second.com')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(screen.getByText('first.com')).toBeInTheDocument()
+    expect(screen.getByText('Conflict 1 of 2')).toBeInTheDocument()
+    const cards = screen.getAllByRole('button').filter(el => el.dataset.selected !== undefined)
+    expect(cards.map(c => c.dataset.selected)).toEqual(['false', 'true'])
+  })
+
   it('goes back through the wizard history', async () => {
     const user = userEvent.setup()
     seedOneConflict()

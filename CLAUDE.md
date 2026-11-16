@@ -96,7 +96,7 @@ The merger groups by `(registrable_domain, lowercased_username)` and emits one o
 - Skip `merge-conflict` when no `hasConflict` accounts.
 - Skip `review-merges` when no `isSubdomainMerge` accounts.
 
-Raw merger output lives in `rawMergedAccounts` (frozen after merge). `mergedAccounts` is the working list that downstream screens consume — rebuilt after conflict resolution and again after Review Merges commit.
+Raw merger output lives in `rawMergedAccounts` (frozen after merge). Screens call `ensureMerged()`, not `runMerge()`, so going Back never re-merges unless the uploads changed — a re-merge wipes conflict answers and review edits. Back inside the conflict run steps to the previous conflict. `mergedAccounts` is the working list that downstream screens consume — rebuilt after conflict resolution and again after Review Merges commit.
 
 ### Conflict resolution shape
 

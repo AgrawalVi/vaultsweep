@@ -93,6 +93,23 @@ describe('advance / back', () => {
     get().back()
     expect(get().step).toBe('welcome')
   })
+
+  it('back on a later conflict steps to the previous conflict and keeps the answers', () => {
+    useWizardStore.setState({
+      step: 'merge-conflict',
+      history: ['import-summary'],
+      rawMergedAccounts: [makeConflictAccount(), makeConflictAccount()],
+    })
+    get().resolveConflict(0, { kind: 'discard' })
+    expect(get().mergeConflictIndex).toBe(1)
+    get().back()
+    expect(get().step).toBe('merge-conflict')
+    expect(get().mergeConflictIndex).toBe(0)
+    expect(get().conflictResolutions).toEqual({ 0: { kind: 'discard' } })
+    get().back()
+    expect(get().step).toBe('import-summary')
+    expect(get().conflictResolutions).toEqual({ 0: { kind: 'discard' } })
+  })
 })
 
 describe('uploads', () => {
@@ -192,6 +209,36 @@ describe('runMerge', () => {
     expect(get().reviewAccounts).toEqual([])
     expect(get().reviewUndoStack).toEqual([])
     expect(get().discardedAccounts).toEqual([])
+  })
+
+  it('ensureMerged merges once, then skips while the uploads are unchanged', async () => {
+    useWizardStore.setState({ rawEntries: [makeRawEntry()] })
+    mockMergeEntries.mockResolvedValue([makeConflictAccount()])
+    await get().ensureMerged()
+    expect(mockMergeEntries).toHaveBeenCalledTimes(1)
+
+    useWizardStore.setState({ conflictResolutions: { 0: { kind: 'discard' } } })
+    await get().ensureMerged()
+    expect(mockMergeEntries).toHaveBeenCalledTimes(1)
+    expect(get().conflictResolutions).toEqual({ 0: { kind: 'discard' } })
+  })
+
+  it('ensureMerged re-merges after the uploads change', async () => {
+    useWizardStore.setState({ uploads: [makeUpload({ id: 'u1' })], rawEntries: [makeRawEntry()] })
+    mockMergeEntries.mockResolvedValue([makeMergedAccount()])
+    await get().ensureMerged()
+    get().renameUpload('u1', 'Work Chrome')
+    await get().ensureMerged()
+    expect(mockMergeEntries).toHaveBeenCalledTimes(2)
+  })
+
+  it('ensureMerged retries after a failed merge', async () => {
+    mockMergeEntries.mockRejectedValueOnce(new Error('merge failed'))
+    await get().ensureMerged()
+    mockMergeEntries.mockResolvedValue([makeMergedAccount()])
+    await get().ensureMerged()
+    expect(mockMergeEntries).toHaveBeenCalledTimes(2)
+    expect(get().mergeError).toBeNull()
   })
 
   it('records a failure without wiping the previous accounts', async () => {
@@ -385,6 +432,7 @@ describe('reset', () => {
       uploads: [makeUpload()],
       rawEntries: [makeRawEntry()],
       rawMergedAccounts: [makeMergedAccount()],
+      lastMergedEntries: [makeRawEntry()],
       mergedAccounts: [makeMergedAccount()],
       discardedAccounts: [makeMergedAccount()],
       reviewAccounts: [makeReviewAccount()],
@@ -399,6 +447,7 @@ describe('reset', () => {
     expect(get().uploads).toEqual([])
     expect(get().rawEntries).toEqual([])
     expect(get().rawMergedAccounts).toEqual([])
+    expect(get().lastMergedEntries).toBeNull()
     expect(get().mergedAccounts).toEqual([])
     expect(get().discardedAccounts).toEqual([])
     expect(get().reviewAccounts).toEqual([])

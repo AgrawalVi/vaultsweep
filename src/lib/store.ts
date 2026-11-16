@@ -62,6 +62,9 @@ interface WizardStore {
   discardedAccounts: MergedAccount[]
   mergeError: string | null
   mergePending: boolean
+  /** The `rawEntries` array the current `rawMergedAccounts` came from. `rawEntries` is
+   *  replaced on every upload change, so identity tells us whether a re-merge is needed. */
+  lastMergedEntries: RawEntry[] | null
 
   // Merge conflict
   mergeConflictIndex: number
@@ -86,6 +89,9 @@ interface WizardStore {
   renameUpload: (id: string, name: string) => void
   removeUpload: (id: string) => void
   runMerge: () => Promise<void>
+  /** Merge only if the uploads changed since the last successful merge. Re-merging wipes
+   *  every conflict answer and review edit, so screens call this on mount, not `runMerge`. */
+  ensureMerged: () => Promise<void>
 
   resolveConflict: (accountIdx: number, resolution: ConflictResolution) => void
 
@@ -113,6 +119,7 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
   discardedAccounts: [],
   mergeError: null,
   mergePending: false,
+  lastMergedEntries: null,
 
   mergeConflictIndex: 0,
   conflictResolutions: {},
@@ -144,7 +151,12 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
   },
 
   back: () => {
-    const { history } = get()
+    const { history, step, mergeConflictIndex } = get()
+    // Within the conflict run, Back steps to the previous conflict; answers are kept.
+    if (step === 'merge-conflict' && mergeConflictIndex > 0) {
+      set({ mergeConflictIndex: mergeConflictIndex - 1 })
+      return
+    }
     if (history.length === 0) return
     const prev = history[history.length - 1]
     set({ step: prev, history: history.slice(0, -1) })
@@ -161,6 +173,7 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
       discardedAccounts: [],
       mergeError: null,
       mergePending: false,
+      lastMergedEntries: null,
       mergeConflictIndex: 0,
       conflictResolutions: {},
       reviewAccounts: [],
@@ -168,7 +181,7 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
       reviewShowAll: false,
       triageIndex: 0,
       triageDecisions: { keep: 0, delete: 0, skip: 0 },
-  triageDecisionById: {},
+      triageDecisionById: {},
     }),
 
   addUpload: async (category, path) => {
@@ -237,10 +250,17 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
         reviewAccounts: [],
         reviewUndoStack: [],
         mergePending: false,
+        lastMergedEntries: rawEntries,
       })
     } catch (err) {
       set({ mergeError: String(err), mergePending: false })
     }
+  },
+
+  ensureMerged: async () => {
+    const { rawEntries, lastMergedEntries, mergePending } = get()
+    if (mergePending || lastMergedEntries === rawEntries) return
+    await get().runMerge()
   },
 
   resolveConflict: (accountIdx, resolution) => {

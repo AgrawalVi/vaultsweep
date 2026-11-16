@@ -179,3 +179,9 @@ sites — see C4 in the plan for why the user-facing copy must not conflate them
 "Keep separate" and Review Merges splits turn one merged account into several accounts that share a domain and username. Each gets `childId(parent, tag)` — `pw:{i}` for keep-separate, `urls:{sorted urls}` for review and skip splits — so ids stay unique and reproducible. The old `accountKey` (domain|username) is renamed `analysisKey`: it is the right cache key for LLM/usage analysis, which is per domain + username, but it collides after a fan-out, so nothing should use it to identify an account.
 
 In Review Merges the row that still holds the source account (the untouched original, the remainder after peeling URLs off, or a regroup that absorbs it) keeps the source id; every other row's id is derived from its URL set. Ids are deterministic for a given sequence of edits, not path-independent — splitting everything and regrouping back gives a child id, not the original one. Nothing downstream needs path-independence, only uniqueness and repeatability.
+
+## Going Back never silently re-merges (VAU-110)
+
+Import Summary used to call `runMerge()` on every mount, so Back from the conflict screen (or any later step) re-ran the merger and reset every conflict answer and review edit. Screens now call `ensureMerged()`, which merges only when `rawEntries` is a different array from the one last merged. `rawEntries` is rebuilt on every upload add, rename or remove, so array identity is an exact "uploads changed" signal without hashing anything that holds passwords. A failed merge doesn't record its input, so the next visit retries.
+
+Back on the conflict screen steps to the previous conflict and shows the saved answer; only Back on the first conflict leaves the run.
